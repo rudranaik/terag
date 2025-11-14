@@ -19,7 +19,6 @@ from typing import List, Tuple
 
 from graph_builder import GraphBuilder, TERAGGraph
 from graph_visualizer import visualize_terag_graph
-from ner_extractor import extract_named_entities  # Assuming this exists
 
 
 def simple_concept_extractor(text: str) -> Tuple[List[str], List[str]]:
@@ -189,8 +188,9 @@ def main():
     
     # Try to use the existing NER extractor, fall back to simple extractor
     try:
-        from ner_extractor import extract_entities_and_concepts
-        extract_concepts_fn = extract_entities_and_concepts
+        from ner_extractor import NERExtractor
+        extractor = NERExtractor(use_llm=False)
+        extract_concepts_fn = extractor.extract_entities_and_concepts
         print("Using advanced NER extractor")
     except ImportError:
         extract_concepts_fn = simple_concept_extractor

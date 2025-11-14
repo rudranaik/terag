@@ -42,3 +42,14 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# TERAG-specific
+.venv/
+json_ner_cache/
+ner_results/
+graph_results/
+dedup_results/
+data/
+*.pkl
+*.gml
+*.graphml
+
