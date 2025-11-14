@@ -49,7 +49,9 @@ ner_results/
 graph_results/
 dedup_results/
 data/
+embeddings_cache/
 *.pkl
 *.gml
 *.graphml
+k.txt
 
