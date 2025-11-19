@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Optional
 
 # Import all required components
-from graph_builder import GraphBuilder, TERAGGraph
-from entity_deduplicator import deduplicate_graph_entities
-from entity_merger import apply_deduplication_to_graph
+from terag.graph.builder import GraphBuilder, TERAGGraph
+from terag.graph.deduplication import OpenAIEntityDeduplicator
+from terag.graph.merger import apply_deduplication_to_graph
 
 
 def run_ner_extraction(chunks_file: str, output_dir: str, verbose: bool = True) -> str:
@@ -60,7 +60,7 @@ def run_ner_extraction(chunks_file: str, output_dir: str, verbose: bool = True) 
     try:
         # Run NER extraction
         cmd = [
-            sys.executable, "json_ner_demo.py",
+            sys.executable, "-m", "terag.ingestion.ner_extraction",
             "--files", chunks_file,
             "--output", ner_output_dir
         ]
@@ -291,8 +291,25 @@ def deduplicate_graph(graph_file: str, output_dir: str, dedup_settings: dict, ve
             print(f"      Phase 2: Embedding similarity (threshold: {dedup_settings['embedding_similarity_threshold']})")
             print(f"      Phase 3: Graph co-occurrence (threshold: {dedup_settings['graph_similarity_threshold']})")
         
+        # Initialize deduplicator
+        deduplicator = OpenAIEntityDeduplicator(
+            embedding_manager=None, # Will be initialized inside if needed, or we should pass it
+            string_similarity_threshold=dedup_settings['string_similarity_threshold'],
+            embedding_similarity_threshold=dedup_settings['embedding_similarity_threshold'],
+            graph_similarity_threshold=dedup_settings['graph_similarity_threshold']
+        )
+        
         # Run deduplication
-        entity_mapping, clusters = deduplicate_graph_entities(graph, **dedup_settings)
+        # Note: OpenAIEntityDeduplicator needs an embedding manager. 
+        # We should initialize it here or let the class handle it.
+        # Let's check how OpenAIEntityDeduplicator is implemented.
+        # It takes embedding_manager in __init__.
+        
+        from terag.embeddings.manager import EmbeddingManager
+        embedding_manager = EmbeddingManager()
+        deduplicator.embedding_manager = embedding_manager
+        
+        entity_mapping, clusters = deduplicator.deduplicate_entities_from_graph(graph)
         
         if entity_mapping:
             if verbose:

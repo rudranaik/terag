@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 import time
 
-from graph_builder import TERAGGraph
+from terag.graph.builder import TERAGGraph
 
 
 @dataclass

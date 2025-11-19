@@ -15,6 +15,23 @@ TERAG is a lightweight graph-based RAG framework that achieves **80%+ of GraphRA
 - **Lightweight**: Minimal LLM usage - only for query NER and answer generation
 - **Scalable**: Efficient for large document collections
 
+## Supported Features & Limitations
+
+### Supported Features
+- **Graph Backend**: Built on **NetworkX** for efficient in-memory graph operations.
+- **Ingestion**: Flexible JSON ingestion for chunks, Q&A pairs, and documents.
+- **Retrieval Algorithms**:
+    - **Personalized PageRank (PPR)**: Biased random walks for entity-centric retrieval.
+    - **Hybrid Retrieval**: Combines PPR scores with semantic vector similarity.
+- **Named Entity Recognition**:
+    - **LLM-based**: Uses Groq/OpenAI for high-accuracy extraction.
+    - **Regex Fallback**: Pattern-based extraction when LLM is unavailable.
+- **Embeddings**: Integrated with **SentenceTransformers** for local semantic search.
+
+### Limitations
+- **Graph Database**: Currently supports **NetworkX** (in-memory) only. Native support for **Neo4j** or **ArangoDB** is **NOT** currently implemented.
+- **Scalability**: Best suited for small to medium-sized graphs (up to ~100k nodes) that fit in memory.
+
 ## Architecture
 
 ### 1. Graph Construction
@@ -56,12 +73,12 @@ weight(node) = frequency_weight(node) × semantic_weight(node)
 
 ## Performance Comparison
 
-| Method | Accuracy | Token Consumption | Relative Cost |
+| Method | Accuracy | Token Consumption | Relative Cost (per token to be ingested) |
 |--------|----------|-------------------|---------------|
-| **GraphRAG** | 100% baseline | 100% baseline | 88x multiplier |
+| **Nano-GraphRAG** | 100% baseline | 100% baseline | 80-200x (personal experience)|
 | **LightRAG** | ~75% | ~30% | High |
 | **MiniRAG** | ~70% | ~25% | High |
-| **TERAG** | 80-90% | 3-11% | **3-5x multiplier** |
+| **TERAG** | 80-90% | 3-11% | **3-5x** |
 
 ## Algorithm Components
 
@@ -97,58 +114,102 @@ weight(node) = frequency_weight(node) × semantic_weight(node)
 8. Generate answer using LLM with retrieved passages
 ```
 
-## Integration with Agentic RAG
 
-TERAG can augment the existing agentic retrieval system:
 
-```python
-from terag import TERAGRetriever
-from agentic_retrieval import AgenticRetriever
+## Installation
 
-# Hybrid approach
-terag_retriever = TERAGRetriever.from_chunks(chunks)
-agentic_retriever = AgenticRetriever.from_chunks(chunks)
-
-# Use TERAG for initial broad retrieval
-terag_results = terag_retriever.retrieve(query, top_k=20)
-
-# Use Agentic RAG for refinement and query rewriting
-final_results = agentic_retriever.refine(query, terag_results)
+### From PyPI
+```bash
+pip install terag
 ```
 
-## Implementation Files
+### From Source
+```bash
+git clone https://github.com/rudranaik/terag.git
+cd terag
+pip install -e .
+```
 
-- `graph_builder.py`: Graph construction from chunks
-- `ner_extractor.py`: Named Entity Recognition for queries/documents
-- `ppr_retriever.py`: Personalized PageRank retrieval algorithm
-- `terag_retriever.py`: Main TERAG retriever interface
-- `example_usage.py`: Usage examples and integration tests
+## Quick Start
 
-## Usage Example
+Get started with TERAG in 3 simple steps:
 
+### 1. Setup
+Ensure you have your API keys set (if using LLM features):
+```bash
+export GROQ_API_KEY="your_key_here"  # Optional: for LLM-based NER
+export OPENAI_API_KEY="your_key_here" # Optional: for embeddings/LLM
+```
+
+### 2. Basic Usage
 ```python
-from terag import TERAGRetriever
+from terag import TERAG, TERAGConfig
 
-# Build graph from chunks
-retriever = TERAGRetriever.from_chunks_file(
-    "chunks_full_metadata.json",
-    extract_concepts=True,  # Extract named entities + concepts
-    min_concept_freq=2      # Filter rare concepts
+# Define some sample data
+chunks = [
+    {"content": "Apple Inc announced strong revenue growth in Q4 2024.", "metadata": {"source": "news"}},
+    {"content": "Microsoft Corporation reported significant cloud achievements.", "metadata": {"source": "news"}}
+]
+
+# Initialize TERAG
+config = TERAGConfig(top_k=3)
+terag = TERAG.from_chunks(chunks, config=config)
+
+# Retrieve
+results, metrics = terag.retrieve("What is the revenue growth?")
+
+# Inspect results
+for result in results:
+    print(f"Score: {result.score:.4f} | Content: {result.content}")
+```
+
+### 3. Advanced Usage
+For more complex scenarios, including custom graph building and hybrid retrieval, check out `terag/examples/example_usage.py`.
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to help improve TERAG.
+
+## Configuration Guide
+
+TERAG is highly configurable to suit different use cases. Here's what each setting does:
+
+| Parameter | Default | Developer Explanation | Product/Business Impact |
+|-----------|---------|-----------------------|-------------------------|
+| `top_k` | `10` | Number of passages to return in the final result set. | **Response Depth**: Higher values give the LLM more context but increase costs and latency. Lower values are faster and cheaper but might miss details. |
+| `min_concept_freq` | `2` | Minimum number of times a concept must appear in the corpus to be included in the graph. | **Noise Reduction**: Filters out one-off mentions or typos. Increase this for cleaner graphs from noisy data (e.g., social media). |
+| `max_concept_freq_ratio` | `0.5` | Maximum ratio of documents a concept can appear in before being excluded (stopword filtering). | **Relevance**: Prevents common words (like "company" in a business report) from dominating the search results. |
+| `ppr_alpha` | `0.15` | Damping factor for Personalized PageRank (teleport probability). | **Exploration vs. Focus**: Lower values explore further away from the query entities (finding indirect connections). Higher values stick closer to direct matches. |
+| `semantic_weight` | `0.5` | Weight given to semantic similarity vs. frequency in the initial node scoring. | **Understanding**: Higher values prioritize concepts that *mean* the same thing as the query, even if spelled differently. |
+| `use_llm_for_ner` | `False` | Whether to use an LLM (Groq/OpenAI) for Named Entity Recognition during ingestion/querying. | **Accuracy vs. Cost**: `True` gives much better entity extraction but costs money per query. `False` is free and fast but less accurate. |
+
+### Example Configuration
+
+**For a high-precision legal search:**
+```python
+config = TERAGConfig(
+    top_k=20,                  # Need comprehensive results
+    min_concept_freq=1,        # Every detail matters
+    use_llm_for_ner=True,      # Maximum accuracy required
+    ppr_alpha=0.1              # Explore indirect relationships
 )
+```
 
-# Retrieve relevant passages
-results = retriever.retrieve(
-    query="What was the company's revenue in 2024?",
-    top_k=10,
-    alpha=0.85,  # PPR damping factor
-    verbose=True
+**For a real-time news chatbot:**
+```python
+config = TERAGConfig(
+    top_k=5,                   # Fast response needed
+    min_concept_freq=3,        # Ignore noise
+    use_llm_for_ner=False,     # Keep costs low
+    ppr_alpha=0.2              # Focus on direct matches
 )
+```
 
-# Results include:
-# - passages: List of relevant passages
-# - scores: PPR scores for each passage
-# - matched_concepts: Query concepts found in graph
-# - graph_stats: Graph structure information
+- `terag/graph/builder.py`: Graph construction from chunks
+- `terag/ingestion/ner_extractor.py`: Named Entity Recognition for queries/documents
+- `terag/retrieval/ppr.py`: Personalized PageRank retrieval algorithm
+- `terag/core.py`: Main TERAG retriever interface
+- `terag/examples/example_usage.py`: Usage examples and integration tests
 ```
 
 ## Research References
@@ -172,7 +233,7 @@ results = retriever.retrieve(
 - Match paper's token efficiency (3-11% consumption)
 - Achieve F1 score > 55% on multi-hop queries
 - Support 100K+ node graphs efficiently
-- Integrate seamlessly with existing agentic RAG
+- Support 100K+ node graphs efficiently
 
 ## Future Enhancements
 

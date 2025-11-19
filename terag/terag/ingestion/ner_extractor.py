@@ -18,8 +18,8 @@ import logging
 import time
 
 # Import our custom components
-from extraction_cache import ExtractionCache
-from groq_client import GroqClient, LLMResponse
+from terag.embeddings.cache import ExtractionCache
+from .groq_client import GroqClient, LLMResponse
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,8 @@ class NERExtractor:
         groq_api_key: Optional[str] = None,
         model: str = "openai/gpt-oss-20b",
         use_fallback: bool = True,
-        enable_progress_reporting: bool = True
+        enable_progress_reporting: bool = True,
+        use_llm: bool = True
     ):
         """
         Initialize LLM-based NER extractor
@@ -60,25 +61,29 @@ class NERExtractor:
             model: Groq model to use
             use_fallback: Whether to use regex fallback if LLM fails
             enable_progress_reporting: Whether to print progress reports
+            use_llm: Whether to use LLM for extraction
         """
         # Initialize caching system
         self.cache = ExtractionCache(cache_dir)
         self.use_fallback = use_fallback
         self.enable_progress_reporting = enable_progress_reporting
+        self.use_llm = use_llm
         
         # Initialize LLM client
-        try:
-            self.groq_client = GroqClient(
-                api_key=groq_api_key,
-                model=model
-            )
-            logger.info(f"Groq client initialized with model: {model}")
-        except Exception as e:
-            if use_fallback:
-                logger.warning(f"Failed to initialize Groq client: {e}. Will use fallback extraction.")
-                self.groq_client = None
-            else:
-                raise e
+        self.groq_client = None
+        if use_llm:
+            try:
+                self.groq_client = GroqClient(
+                    api_key=groq_api_key,
+                    model=model
+                )
+                logger.info(f"Groq client initialized with model: {model}")
+            except Exception as e:
+                if use_fallback:
+                    logger.warning(f"Failed to initialize Groq client: {e}. Will use fallback extraction.")
+                    self.groq_client = None
+                else:
+                    raise e
 
         # Common patterns for different entity types
         self.patterns = {
@@ -523,8 +528,7 @@ class QueryNER:
         """
         # Use pattern-based extraction (fast)
         entities, _ = self.extractor.extract_entities_and_concepts(
-            query,
-            extract_concepts=False
+            query
         )
 
         # Optionally enhance with LLM for better accuracy

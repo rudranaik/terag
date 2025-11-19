@@ -20,7 +20,7 @@ except ImportError:
     nx = None
 
 # Import our edge weight calculator
-from edge_weight_calculator import EdgeWeightCalculator
+from terag.utils.edge_weights import EdgeWeightCalculator
 
 
 @dataclass

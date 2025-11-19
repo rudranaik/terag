@@ -12,10 +12,10 @@ from dataclasses import dataclass
 import numpy as np
 from collections import defaultdict
 
-from query_processor import ProcessedQuery, QueryProcessor
-from ppr_retriever import TERAGRetriever as PPRRetriever
-from semantic_retriever import SemanticRetriever
-from embedding_manager import EmbeddingManager
+from .query_processor import ProcessedQuery, QueryProcessor
+from .ppr import TERAGRetriever as PPRRetriever
+from .semantic import SemanticRetriever
+from terag.embeddings.manager import EmbeddingManager
 
 logger = logging.getLogger(__name__)
 

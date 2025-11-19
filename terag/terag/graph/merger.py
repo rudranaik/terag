@@ -8,8 +8,8 @@ Merges nodes and redirects edges safely.
 import logging
 from typing import Dict, List, Set
 from collections import defaultdict
-from graph_builder import TERAGGraph, ConceptNode
-from entity_deduplicator import EntityCluster
+from .builder import TERAGGraph, ConceptNode
+from .types import EntityCluster
 
 logger = logging.getLogger(__name__)
 

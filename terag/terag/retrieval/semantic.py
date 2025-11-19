@@ -11,8 +11,8 @@ from typing import List, Dict, Tuple, Optional
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-from embedding_manager import EmbeddingManager
-from query_processor import ProcessedQuery
+from terag.embeddings.manager import EmbeddingManager
+from .query_processor import ProcessedQuery
 
 logger = logging.getLogger(__name__)
 

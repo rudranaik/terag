@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-from embedding_manager import EmbeddingManager
+from terag.embeddings.manager import EmbeddingManager
 
 logger = logging.getLogger(__name__)
 

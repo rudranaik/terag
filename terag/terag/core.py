@@ -13,9 +13,9 @@ from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import time
 
-from graph_builder import TERAGGraph, GraphBuilder
-from ner_extractor import NERExtractor, QueryNER, extract_concepts_from_text
-from ppr_retriever import TERAGRetriever as PPRRetriever, RetrievalResult, RetrievalMetrics
+from terag.graph.builder import TERAGGraph, GraphBuilder
+from terag.ingestion.ner_extractor import NERExtractor, QueryNER, extract_concepts_from_text
+from terag.retrieval.ppr import TERAGRetriever as PPRRetriever, RetrievalResult, RetrievalMetrics
 
 
 @dataclass

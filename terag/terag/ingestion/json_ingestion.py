@@ -530,9 +530,7 @@ def run_json_analysis_demo(json_files: List[str]):
 if __name__ == "__main__":
     # Example usage with your JSON files
     json_files = [
-        "/Users/rudranaik/Documents/terag/data/Q2 PPT.json",
-        "/Users/rudranaik/Documents/terag/data/Q2 transcript.json",
-        "/Users/rudranaik/Documents/terag/data/annual report 2025.json"
+        "examples/sample_data.json"
     ]
     
     run_json_analysis_demo(json_files)

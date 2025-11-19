@@ -55,4 +55,7 @@ embeddings_cache/
 *.gml
 *.graphml
 k.txt
+extraction_cache/
+retrieval_results/
+quick_extraction_cache/
 

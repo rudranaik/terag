@@ -17,7 +17,8 @@ from typing import List, Dict
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from terag_retriever import TERAG, TERAGConfig, create_terag_from_existing_chunks
+from terag import TERAG, TERAGConfig
+from terag.core import create_terag_from_existing_chunks
 
 
 def example_1_basic_usage():

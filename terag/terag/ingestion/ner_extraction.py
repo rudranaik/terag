@@ -14,9 +14,11 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any
 
-from json_ingestion import JSONIngestionAdapter, IngestionRule
-from ner_extractor import NERExtractor
-from extraction_cache import print_progress_report
+from terag.embeddings.cache import ExtractionCache, print_progress_report
+from .groq_client import GroqClient, LLMResponse
+
+from .json_ingestion import JSONIngestionAdapter, IngestionRule
+from .ner_extractor import NERExtractor
 
 # Configure logging
 logging.basicConfig(

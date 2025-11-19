@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import List, Dict, Set, Tuple
 from collections import defaultdict
 
-from graph_builder import TERAGGraph
-from embedding_manager import EmbeddingManager
-from entity_deduplicator import DuplicateCandidate, EntityCluster
-from entity_merger import apply_deduplication_to_graph
+from .builder import TERAGGraph
+from terag.embeddings.manager import EmbeddingManager
+from .merger import apply_deduplication_to_graph
+from .types import DuplicateCandidate, EntityCluster
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import dotenv
