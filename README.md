@@ -43,6 +43,16 @@ TERAG uses a directed, unweighted graph **G = (V, E)** where:
 - **Edges (E ⊆ V×V)**: Directed connections between passages and concepts
 - **Storage**: Adjacency lists for efficient neighborhood expansion
 
+### Visual Representation
+
+![TERAG Graph Structure](docs/images/graph_structure.png)
+
+**Legend:**
+- **Passage Nodes (White Squares)**: The actual text chunks from your documents.
+- **Entity Nodes (Blue Circles)**: Specific named entities (People, Orgs, Dates).
+- **Concept Nodes (Purple Circles)**: Abstract topics or themes shared across passages.
+- **Edges**: Bidirectional links. If Passage 1 mentions "Apple", they are connected. This allows the retrieval to "hop" from one passage to another via shared concepts.
+
 ### 2. Concept Extraction
 
 Lightweight concept extraction focusing on:
@@ -146,6 +156,8 @@ export OPENAI_API_KEY="your_key_here" # Optional: for embeddings/LLM
 from terag import TERAG, TERAGConfig
 
 # Define some sample data
+# NOTE: The 'content' key is REQUIRED. It is the only field used for graph construction.
+# 'metadata' is optional and stored but not used for indexing.
 chunks = [
     {"content": "Apple Inc announced strong revenue growth in Q4 2024.", "metadata": {"source": "news"}},
     {"content": "Microsoft Corporation reported significant cloud achievements.", "metadata": {"source": "news"}}
@@ -163,7 +175,20 @@ for result in results:
     print(f"Score: {result.score:.4f} | Content: {result.content}")
 ```
 
-### 3. Advanced Usage
+### 3. Visualization & Export
+TERAG uses a custom JSON format for storage, but you can easily export to **GraphML** (supported by Gephi, Cytoscape, etc.) using NetworkX:
+
+```python
+import networkx as nx
+
+# Convert to NetworkX graph
+G = terag.graph.to_networkx()
+
+# Save as GraphML for visualization tools
+nx.write_graphml(G, "terag_graph.graphml")
+```
+
+### 4. Advanced Usage
 For more complex scenarios, including custom graph building and hybrid retrieval, check out `terag/examples/example_usage.py`.
 
 ## Contributing

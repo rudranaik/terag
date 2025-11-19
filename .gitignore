@@ -59,3 +59,5 @@ extraction_cache/
 retrieval_results/
 quick_extraction_cache/
 
+PUBLISHING_TO_PYPI.md
+sanity.md
