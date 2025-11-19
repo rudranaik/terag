@@ -45,7 +45,7 @@ TERAG uses a directed, unweighted graph **G = (V, E)** where:
 
 ### Visual Representation
 
-![TERAG Graph Structure](docs/images/graph_structure.png)
+![TERAG Graph Structure](https://github.com/rudranaik/terag/blob/main/docs/images/graph_structure.png?raw=true)
 
 **Legend:**
 - **Passage Nodes (White Squares)**: The actual text chunks from your documents.

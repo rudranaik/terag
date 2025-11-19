@@ -49,7 +49,7 @@ from .ppr_retriever import (
     RetrievalMetrics
 )
 
-__version__ = "0.5.1"
+__version__ = "0.5.5"
 __author__ = "Custom RAG Team"
 
 __all__ = [
