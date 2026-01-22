@@ -19,7 +19,10 @@ import time
 
 # Import our custom components
 from terag.embeddings.cache import ExtractionCache
-from .groq_client import GroqClient, LLMResponse
+from terag.embeddings.cache import ExtractionCache
+from .groq_client import GroqClient, LLMResponse  # Keep for backward compatibility
+from .llm_providers import get_llm_provider
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,21 +50,16 @@ class NERExtractor:
         self,
         cache_dir: str = "extraction_cache",
         groq_api_key: Optional[str] = None,
-        model: str = "openai/gpt-oss-20b",
+        model: Optional[str] = "openai/gpt-oss-20b",
         use_fallback: bool = True,
         enable_progress_reporting: bool = True,
-        use_llm: bool = True
+        use_llm: bool = True,
+        # New parameters
+        provider: str = "groq",
+        api_key: Optional[str] = None
     ):
         """
         Initialize LLM-based NER extractor
-        
-        Args:
-            cache_dir: Directory for caching extractions
-            groq_api_key: Groq API key (if None, loads from environment)
-            model: Groq model to use
-            use_fallback: Whether to use regex fallback if LLM fails
-            enable_progress_reporting: Whether to print progress reports
-            use_llm: Whether to use LLM for extraction
         """
         # Initialize caching system
         self.cache = ExtractionCache(cache_dir)
@@ -70,17 +68,39 @@ class NERExtractor:
         self.use_llm = use_llm
         
         # Initialize LLM client
-        self.groq_client = None
+        self.llm_provider = None
+        self.groq_client = None  # Backward compatibility
+        
         if use_llm:
             try:
-                self.groq_client = GroqClient(
-                    api_key=groq_api_key,
-                    model=model
+                # Use provided api_key or fallback to groq_api_key for backward compat
+                effective_api_key = api_key or groq_api_key
+                
+                self.llm_provider = get_llm_provider(
+                    provider_name=provider,
+                    api_key=effective_api_key,
+                    model=model,
+                    silent_fallback=not use_llm
                 )
-                logger.info(f"Groq client initialized with model: {model}")
+                
+                # Set groq_client for backward compatibility if provider is groq
+                if provider == "groq" and hasattr(self.llm_provider, 'client'): 
+                     # This is a bit hacky but maintains compatibility
+                     # Ideally we just use self.llm_provider everywhere
+                     pass
+                     
+                if self.llm_provider.client is not None:
+                    logger.info(f"LLM provider '{provider}' initialized with model: {self.llm_provider.model}")
+                    # Alias for backward compatibility code that accesses self.groq_client directly
+                    self.groq_client = self.llm_provider 
+                else:
+                    logger.info("LLM not available (no API key), using regex fallback")
+                    self.llm_provider = None
+                    self.groq_client = None
             except Exception as e:
                 if use_fallback:
-                    logger.warning(f"Failed to initialize Groq client: {e}. Will use fallback extraction.")
+                    logger.info(f"LLM not available ({e}), using regex fallback")
+                    self.llm_provider = None
                     self.groq_client = None
                 else:
                     raise e
@@ -148,7 +168,7 @@ class NERExtractor:
         if self.groq_client:
             entities, concepts = self._extract_with_llm(text, document_metadata, passage_metadata)
         elif self.use_fallback:
-            logger.warning("LLM not available, using fallback extraction")
+            # Silent fallback - no warning needed
             entities, concepts = self._extract_fallback(text)
         else:
             raise RuntimeError("LLM client not available and fallback disabled")

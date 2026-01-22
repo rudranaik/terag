@@ -24,8 +24,9 @@ TERAG is a lightweight graph-based RAG framework that achieves **80%+ of GraphRA
     - **Personalized PageRank (PPR)**: Biased random walks for entity-centric retrieval.
     - **Hybrid Retrieval**: Combines PPR scores with semantic vector similarity.
 - **Named Entity Recognition**:
-    - **LLM-based**: Uses Groq/OpenAI for high-accuracy extraction.
+    - **LLM-based**: Uses Groq (default) or OpenAI for high-accuracy extraction.
     - **Regex Fallback**: Pattern-based extraction when LLM is unavailable.
+- **Graph Persistence**: Auto-save and load graphs for reuse.
 - **Embeddings**: Integrated with **SentenceTransformers** for local semantic search.
 
 ### Limitations
@@ -207,16 +208,20 @@ TERAG is highly configurable to suit different use cases. Here's what each setti
 | `ppr_alpha` | `0.15` | Damping factor for Personalized PageRank (teleport probability). | **Exploration vs. Focus**: Lower values explore further away from the query entities (finding indirect connections). Higher values stick closer to direct matches. |
 | `semantic_weight` | `0.5` | Weight given to semantic similarity vs. frequency in the initial node scoring. | **Understanding**: Higher values prioritize concepts that *mean* the same thing as the query, even if spelled differently. |
 | `use_llm_for_ner` | `False` | Whether to use an LLM (Groq/OpenAI) for Named Entity Recognition during ingestion/querying. | **Accuracy vs. Cost**: `True` gives much better entity extraction but costs money per query. `False` is free and fast but less accurate. |
+| `llm_provider` | `"groq"` | Which LLM provider to use ("groq" or "openai") if `use_llm_for_ner` is True. | **Flexibility**: Switch providers based on credit/availability. |
+| `auto_save_graph` | `False` | Whether to automatically save the built graph to disk. | **UX**: Prevents losing work after long build times. |
+| `graph_save_path` | `terag_graph.json` | Path to save the graph if auto-save is enabled. | **Organization**: Manage multiple graph versions. |
 
 ### Example Configuration
 
-**For a high-precision legal search:**
+**For a high-precision legal search (using OpenAI):**
 ```python
 config = TERAGConfig(
-    top_k=20,                  # Need comprehensive results
-    min_concept_freq=1,        # Every detail matters
-    use_llm_for_ner=True,      # Maximum accuracy required
-    ppr_alpha=0.1              # Explore indirect relationships
+    top_k=20,
+    min_concept_freq=1,
+    use_llm_for_ner=True,
+    llm_provider="openai",
+    auto_save_graph=True
 )
 ```
 

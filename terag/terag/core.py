@@ -14,7 +14,8 @@ from dataclasses import dataclass
 import time
 
 from terag.graph.builder import TERAGGraph, GraphBuilder
-from terag.ingestion.ner_extractor import NERExtractor, QueryNER, extract_concepts_from_text
+from terag.ingestion.ner_extractor import NERExtractor, extract_concepts_from_text
+from terag.ingestion.query_ner import ImprovedQueryNER
 from terag.retrieval.ppr import TERAGRetriever as PPRRetriever, RetrievalResult, RetrievalMetrics
 
 
@@ -37,8 +38,15 @@ class TERAGConfig:
     # Retrieval
     top_k: int = 10
 
+    
     # Optional LLM for enhanced NER
     use_llm_for_ner: bool = False
+    llm_provider: str = "groq"  # "groq" or "openai"
+    llm_api_key: Optional[str] = None  # Override env var
+    
+    # Graph persistence
+    auto_save_graph: bool = False
+    graph_save_path: Optional[str] = "terag_graph.json"  # Default save location
 
 
 class TERAG:
@@ -64,8 +72,17 @@ class TERAG:
         self.embedding_model = embedding_model
 
         # Initialize components
-        self.ner_extractor = NERExtractor(use_llm=config.use_llm_for_ner)
-        self.query_ner = QueryNER()
+        # Initialize components
+        self.ner_extractor = NERExtractor(
+            use_llm=config.use_llm_for_ner, 
+            provider=config.llm_provider,
+            api_key=config.llm_api_key
+        )
+        self.query_ner = ImprovedQueryNER(
+            use_llm=config.use_llm_for_ner,
+            provider=config.llm_provider,
+            api_key=config.llm_api_key
+        )
         self.retriever = PPRRetriever(
             graph=graph,
             embedding_model=embedding_model,
@@ -99,7 +116,19 @@ class TERAG:
         if verbose:
             print("Building TERAG system from chunks...")
             print(f"  Chunks: {len(chunks)}")
-            print(f"  Config: {config}")
+            print(f"  LLM-based NER: {'ENABLED' if config.use_llm_for_ner else 'DISABLED (using regex fallback)'}")
+            if config.use_llm_for_ner:
+                print(f"  Provider: {config.llm_provider}")
+                
+                # Check for appropriate API key
+                import os
+                key_name = f"{config.llm_provider.upper()}_API_KEY"
+                has_key = config.llm_api_key or os.getenv(key_name)
+                
+                if has_key:
+                    print(f"  API Key: Found ({'config override' if config.llm_api_key else key_name})")
+                else:
+                    print(f"  API Key: Not found (will use regex fallback)")
 
         start_time = time.time()
 
@@ -126,6 +155,14 @@ class TERAG:
 
         # Create TERAG system
         terag = cls(graph=graph, config=config, embedding_model=embedding_model)
+        
+        # Auto-save graph if configured
+        if config.auto_save_graph and config.graph_save_path:
+            save_path = config.graph_save_path
+            terag.save_graph(save_path)
+            if verbose:
+                print(f"\n✓ Graph auto-saved to: {save_path}")
+                print(f"  To load: TERAG.from_graph_file('{save_path}')")
 
         return terag
 
@@ -214,7 +251,7 @@ class TERAG:
             top_k = self.config.top_k
 
         # Extract query entities
-        query_entities = self.query_ner.extract_query_entities(query)
+        query_entities = self.query_ner.extract_query_entities(query, verbose=verbose)
 
         # Retrieve using PPR
         results, metrics = self.retriever.retrieve(
@@ -230,8 +267,10 @@ class TERAG:
 
     def save_graph(self, filepath: str):
         """Save graph to file for reuse"""
+        import os
         self.graph.save_to_file(filepath)
-        print(f"Graph saved to {filepath}")
+        abs_path = os.path.abspath(filepath)
+        print(f"✓ Graph saved to: {abs_path}")
 
     def get_graph_statistics(self) -> Dict:
         """Get graph statistics"""

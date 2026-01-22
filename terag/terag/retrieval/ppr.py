@@ -336,18 +336,20 @@ class TERAGRetriever:
         matched = set()
 
         for entity in query_entities:
-            entity_lower = entity.lower().strip()
+            # Normalize entity same way as GraphBuilder (lowercase + strip extra spaces)
+            entity_normalized = " ".join(entity.lower().strip().split())
 
             # Exact match
-            if entity_lower in self.graph.concepts:
-                matched.add(entity_lower)
+            if entity_normalized in self.graph.concepts:
+                matched.add(entity_normalized)
                 continue
 
             # Partial match (entity contained in concept or vice versa)
             for concept_id, concept in self.graph.concepts.items():
-                concept_text_lower = concept.concept_text.lower()
-
-                if entity_lower in concept_text_lower or concept_text_lower in entity_lower:
+                # concept_id is already normalized in graph
+                
+                # Check if entity is substring of concept or vice versa
+                if entity_normalized in concept_id or concept_id in entity_normalized:
                     matched.add(concept_id)
 
         return matched

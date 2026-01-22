@@ -57,7 +57,8 @@ class GroqClient:
         model: str = "openai/gpt-oss-20b",  # Default model
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        timeout: int = 30
+        timeout: int = 30,
+        silent_fallback: bool = False
     ):
         """
         Initialize Groq client
@@ -68,14 +69,29 @@ class GroqClient:
             max_retries: Number of retry attempts
             retry_delay: Delay between retries in seconds
             timeout: Request timeout in seconds
+            silent_fallback: If True, suppress error messages when API key is missing
         """
         if not GROQ_AVAILABLE:
             raise ImportError("Groq package not available. Install with: pip install groq")
         
+        self.silent_fallback = silent_fallback
+        
         # Get API key
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
-            raise ValueError("Groq API key not provided. Set GROQ_API_KEY environment variable or pass api_key parameter")
+            error_msg = "Groq API key not provided. Set GROQ_API_KEY environment variable or pass api_key parameter"
+            if not silent_fallback:
+                raise ValueError(error_msg)
+            else:
+                # Silent mode - just log and return without initializing client
+                logger.debug(error_msg)
+                self.client = None
+                self.model = model
+                self.max_retries = max_retries
+                self.retry_delay = retry_delay
+                self.timeout = timeout
+                self.pricing = {}
+                return
         
         # Initialize Groq client
         self.client = Groq(api_key=self.api_key)
