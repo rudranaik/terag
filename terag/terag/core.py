@@ -38,6 +38,9 @@ class TERAGConfig:
     # Retrieval
     top_k: int = 10
 
+    # Semantic entity matching
+    use_semantic_entity_matching: bool = True  # Enable semantic similarity-based entity matching
+    semantic_match_threshold: float = 0.7  # Cosine similarity threshold for semantic matching
     
     # Optional LLM for enhanced NER
     use_llm_for_ner: bool = False
@@ -87,7 +90,9 @@ class TERAG:
             graph=graph,
             embedding_model=embedding_model,
             alpha=config.ppr_alpha,
-            ppr_max_iterations=config.ppr_max_iterations
+            ppr_max_iterations=config.ppr_max_iterations,
+            use_semantic_matching=config.use_semantic_entity_matching,
+            semantic_threshold=config.semantic_match_threshold
         )
 
     @classmethod
@@ -105,6 +110,7 @@ class TERAG:
             chunks: List of chunk dicts with 'content' and 'metadata'
             config: TERAG configuration
             embedding_model: Optional embedding model (e.g., SentenceTransformer)
+                           If None and OPENAI_API_KEY is available, will auto-create EmbeddingManager
             verbose: Print progress
 
         Returns:
@@ -129,6 +135,32 @@ class TERAG:
                     print(f"  API Key: Found ({'config override' if config.llm_api_key else key_name})")
                 else:
                     print(f"  API Key: Not found (will use regex fallback)")
+
+        # Auto-create EmbeddingManager if not provided and OPENAI_API_KEY is available
+        if embedding_model is None and config.use_semantic_entity_matching:
+            import os
+            openai_key = os.getenv("OPENAI_API_KEY")
+            if openai_key:
+                try:
+                    from terag.embeddings.manager import EmbeddingManager
+                    embedding_model = EmbeddingManager(api_key=openai_key)
+                    if verbose:
+                        print(f"  Semantic Matching: ENABLED (auto-created EmbeddingManager)")
+                        print(f"    Model: text-embedding-3-small")
+                        print(f"    Threshold: {config.semantic_match_threshold}")
+                except ImportError:
+                    if verbose:
+                        print(f"  Semantic Matching: DISABLED (EmbeddingManager not available)")
+            else:
+                if verbose:
+                    print(f"  Semantic Matching: DISABLED (no OPENAI_API_KEY found)")
+        elif embedding_model is not None:
+            if verbose:
+                print(f"  Semantic Matching: ENABLED (using provided embedding model)")
+                print(f"    Threshold: {config.semantic_match_threshold}")
+        else:
+            if verbose:
+                print(f"  Semantic Matching: DISABLED (use_semantic_entity_matching=False)")
 
         start_time = time.time()
 
@@ -209,6 +241,7 @@ class TERAG:
             graph_file: Path to graph JSON file
             config: TERAG configuration
             embedding_model: Optional embedding model
+                           If None and OPENAI_API_KEY is available, will auto-create EmbeddingManager
             verbose: Print progress
 
         Returns:
@@ -217,7 +250,15 @@ class TERAG:
         if verbose:
             print(f"Loading graph from {graph_file}...")
 
-        graph = TERAGGraph.load_from_file(graph_file)
+        # Load graph and embeddings
+        graph_data = TERAGGraph.load_from_file(graph_file)
+        
+        # Handle both old format (just graph) and new format (graph, embeddings)
+        if isinstance(graph_data, tuple):
+            graph, saved_embeddings = graph_data
+        else:
+            graph = graph_data
+            saved_embeddings = None
 
         if config is None:
             config = TERAGConfig()
@@ -227,8 +268,45 @@ class TERAG:
             print(f"  Passages: {stats['num_passages']}")
             print(f"  Concepts: {stats['num_concepts']}")
             print(f"  Edges: {stats['num_edges']}")
+            if saved_embeddings:
+                print(f"  Loaded {len(saved_embeddings)} concept embeddings from graph file")
 
-        return cls(graph=graph, config=config, embedding_model=embedding_model)
+        # Auto-create EmbeddingManager if not provided and OPENAI_API_KEY is available
+        if embedding_model is None and config.use_semantic_entity_matching:
+            import os
+            openai_key = os.getenv("OPENAI_API_KEY")
+            if openai_key:
+                try:
+                    from terag.embeddings.manager import EmbeddingManager
+                    embedding_model = EmbeddingManager(api_key=openai_key)
+                    if verbose:
+                        print(f"  Semantic Matching: ENABLED (auto-created EmbeddingManager)")
+                        print(f"    Model: text-embedding-3-small")
+                        print(f"    Threshold: {config.semantic_match_threshold}")
+                except ImportError:
+                    if verbose:
+                        print(f"  Semantic Matching: DISABLED (EmbeddingManager not available)")
+            else:
+                if verbose:
+                    print(f"  Semantic Matching: DISABLED (no OPENAI_API_KEY found)")
+        elif embedding_model is not None:
+            if verbose:
+                print(f"  Semantic Matching: ENABLED (using provided embedding model)")
+                print(f"    Threshold: {config.semantic_match_threshold}")
+        else:
+            if verbose:
+                print(f"  Semantic Matching: DISABLED (use_semantic_entity_matching=False)")
+
+        # Create TERAG instance
+        terag = cls(graph=graph, config=config, embedding_model=embedding_model)
+        
+        # Restore saved embeddings to retriever if available
+        if saved_embeddings and hasattr(terag, 'retriever'):
+            terag.retriever.concept_embeddings = saved_embeddings
+            if verbose:
+                print(f"  ✓ Restored {len(saved_embeddings)} concept embeddings to retriever")
+        
+        return terag
 
     def retrieve(
         self,
@@ -266,9 +344,17 @@ class TERAG:
         return results, metrics
 
     def save_graph(self, filepath: str):
-        """Save graph to file for reuse"""
+        """Save graph to file for reuse, including concept embeddings if available"""
         import os
-        self.graph.save_to_file(filepath)
+        
+        # Get concept embeddings from retriever if available
+        concept_embeddings = None
+        if hasattr(self, 'retriever') and hasattr(self.retriever, 'concept_embeddings'):
+            if self.retriever.concept_embeddings:
+                concept_embeddings = self.retriever.concept_embeddings
+                print(f"  Saving {len(concept_embeddings)} concept embeddings with graph")
+        
+        self.graph.save_to_file(filepath, concept_embeddings=concept_embeddings)
         abs_path = os.path.abspath(filepath)
         print(f"✓ Graph saved to: {abs_path}")
 

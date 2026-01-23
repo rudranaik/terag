@@ -123,8 +123,15 @@ class TERAGGraph:
             "std": np.std(frequencies)
         }
 
-    def save_to_file(self, filepath: str):
-        """Save graph to JSON file"""
+    def save_to_file(self, filepath: str, concept_embeddings: dict = None):
+        """
+        Save graph to JSON file
+        
+        Args:
+            filepath: Path to save the graph
+            concept_embeddings: Optional dict mapping concept_id -> embedding array
+                              If provided, embeddings will be saved with the graph
+        """
         data = {
             "passages": [
                 {
@@ -151,13 +158,26 @@ class TERAGGraph:
                 for passage_id, concepts in self.passage_to_concepts.items()
             }
         }
+        
+        # Add embeddings if provided
+        if concept_embeddings:
+            data["concept_embeddings"] = {
+                concept_id: embedding.tolist()  # Convert numpy array to list for JSON
+                for concept_id, embedding in concept_embeddings.items()
+            }
 
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     @classmethod
-    def load_from_file(cls, filepath: str) -> 'TERAGGraph':
-        """Load graph from JSON file"""
+    def load_from_file(cls, filepath: str):
+        """
+        Load graph from JSON file
+        
+        Returns:
+            Tuple of (TERAGGraph, concept_embeddings_dict or None)
+            concept_embeddings_dict maps concept_id -> numpy array
+        """
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
@@ -189,8 +209,16 @@ class TERAGGraph:
         for passage_id, concept_ids in data["edges"].items():
             for concept_id in concept_ids:
                 graph.add_edge(passage_id, concept_id)
+        
+        # Load embeddings if present
+        concept_embeddings = None
+        if "concept_embeddings" in data:
+            concept_embeddings = {
+                concept_id: np.array(embedding)
+                for concept_id, embedding in data["concept_embeddings"].items()
+            }
 
-        return graph
+        return graph, concept_embeddings
 
     def to_networkx(self, include_node_attributes: bool = True, include_edge_weights: bool = False, flatten_metadata: bool = False) -> 'nx.Graph':
         """

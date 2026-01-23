@@ -195,10 +195,14 @@ class TERAGRetriever:
         graph: TERAGGraph,
         embedding_model: Optional[object] = None,
         alpha: float = 0.15,
-        ppr_max_iterations: int = 100
+        ppr_max_iterations: int = 100,
+        use_semantic_matching: bool = True,
+        semantic_threshold: float = 0.7
     ):
         self.graph = graph
         self.embedding_model = embedding_model
+        self.use_semantic_matching = use_semantic_matching
+        self.semantic_threshold = semantic_threshold
         self.ppr = PersonalizedPageRank(
             graph=graph,
             alpha=alpha,
@@ -330,28 +334,69 @@ class TERAGRetriever:
     def _match_entities_to_concepts(self, query_entities: List[str]) -> Set[str]:
         """
         Match query entities to graph concept IDs
-
-        Uses fuzzy matching to handle variations
+        
+        Uses three strategies in parallel:
+        1. Exact text match
+        2. Partial text match (substring)
+        3. Semantic similarity match (if enabled)
+        
+        All strategies run simultaneously and results are combined.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         matched = set()
-
+        
         for entity in query_entities:
             # Normalize entity same way as GraphBuilder (lowercase + strip extra spaces)
             entity_normalized = " ".join(entity.lower().strip().split())
-
-            # Exact match
+            entity_matches = set()
+            match_strategies = []  # Track which strategies found matches
+            
+            # Strategy 1: Exact match
             if entity_normalized in self.graph.concepts:
-                matched.add(entity_normalized)
-                continue
-
-            # Partial match (entity contained in concept or vice versa)
-            for concept_id, concept in self.graph.concepts.items():
-                # concept_id is already normalized in graph
-                
+                entity_matches.add(entity_normalized)
+                match_strategies.append("exact")
+            
+            # Strategy 2: Partial text match
+            for concept_id in self.graph.concepts:
                 # Check if entity is substring of concept or vice versa
                 if entity_normalized in concept_id or concept_id in entity_normalized:
-                    matched.add(concept_id)
-
+                    if concept_id not in entity_matches:
+                        entity_matches.add(concept_id)
+                        if "partial" not in match_strategies:
+                            match_strategies.append("partial")
+            
+            # Strategy 3: Semantic match (if enabled)
+            if (self.use_semantic_matching and 
+                self.embedding_model and 
+                self.concept_embeddings):
+                
+                # Encode the entity
+                if hasattr(self.embedding_model, 'encode'):
+                    entity_emb = self.embedding_model.encode([entity_normalized])[0]
+                    
+                    # Compare with all concept embeddings
+                    for concept_id, concept_emb in self.concept_embeddings.items():
+                        # Cosine similarity (assuming normalized embeddings)
+                        similarity = np.dot(entity_emb, concept_emb)
+                        
+                        if similarity >= self.semantic_threshold:
+                            if concept_id not in entity_matches:
+                                entity_matches.add(concept_id)
+                                if "semantic" not in match_strategies:
+                                    match_strategies.append("semantic")
+            
+            # Log matching results
+            if entity_matches:
+                logger.debug(
+                    f"Entity '{entity}' matched {len(entity_matches)} concepts "
+                    f"using strategies: {', '.join(match_strategies)}"
+                )
+                matched.update(entity_matches)
+            else:
+                logger.debug(f"Entity '{entity}' found no matching concepts")
+        
         return matched
 
     def _build_restart_vector(

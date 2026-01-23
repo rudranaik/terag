@@ -227,6 +227,28 @@ class EmbeddingManager:
         
         return results
     
+    def encode(self, texts, show_progress_bar: bool = False):
+        """
+        Encode texts to embeddings (SentenceTransformers-compatible interface)
+        
+        Args:
+            texts: Single text string or list of texts
+            show_progress_bar: Whether to show progress (for compatibility)
+            
+        Returns:
+            numpy array of embeddings
+        """
+        # Handle single text
+        if isinstance(texts, str):
+            texts = [texts]
+        
+        # Use embed_texts_batch
+        embeddings_dict = self.embed_texts_batch(texts, show_progress=show_progress_bar)
+        
+        # Convert to numpy array in same order as input
+        embeddings = [embeddings_dict[text] for text in texts]
+        return np.array(embeddings)
+    
     def _call_openai_embedding(self, texts: List[str]) -> Optional[List[List[float]]]:
         """
         Call OpenAI embedding API with retries

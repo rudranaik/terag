@@ -33,6 +33,239 @@ TERAG is a lightweight graph-based RAG framework that achieves **80%+ of GraphRA
 - **Graph Database**: Currently supports **NetworkX** (in-memory) only. Native support for **Neo4j** or **ArangoDB** is **NOT** currently implemented.
 - **Scalability**: Best suited for small to medium-sized graphs (up to ~100k nodes) that fit in memory.
 
+## Semantic Entity Matching
+
+### Overview
+
+TERAG uses **hybrid entity matching** that combines three complementary strategies to match query entities to graph concepts:
+
+1. **Exact Match**: Direct text match (e.g., "revenue" → "revenue")
+2. **Partial Match**: Substring matching (e.g., "cash" → "cash flow")
+3. **Semantic Match**: Embedding-based similarity (e.g., "cashflow" → "cash flow", "AI" → "artificial intelligence")
+
+All three strategies run **in parallel** and their results are combined, ensuring maximum recall while maintaining precision.
+
+### Why Semantic Matching?
+
+Text-based matching alone fails to handle:
+- **Spelling variations**: "cash flow" vs "cashflow"
+- **Synonyms**: "revenue" vs "income", "CEO" vs "chief executive officer"
+- **Abbreviations**: "AI" vs "artificial intelligence", "Q4" vs "fourth quarter"
+- **Semantic equivalence**: "revenue growth" vs "income expansion"
+
+Semantic matching uses embeddings to understand the **meaning** of entities, not just their text.
+
+### Configuration
+
+Semantic matching is **enabled by default** but requires an embedding model to function. If no embedding model is provided, TERAG automatically falls back to text-only matching.
+
+#### Basic Setup
+
+```python
+from terag import TERAG, TERAGConfig
+from terag.embeddings.manager import EmbeddingManager
+import os
+
+# Create embedding manager (required for semantic matching)
+embedding_manager = EmbeddingManager(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    model="text-embedding-3-small"  # Default, can use other models
+)
+
+# Configure TERAG with semantic matching
+config = TERAGConfig(
+    use_semantic_entity_matching=True,  # Default: True
+    semantic_match_threshold=0.7,       # Default: 0.7
+    top_k=10
+)
+
+# IMPORTANT: Pass embedding_model during graph creation
+terag = TERAG.from_chunks(
+    chunks, 
+    config=config,
+    embedding_model=embedding_manager  # Required for semantic matching
+)
+
+# Now semantic matching is active
+results, metrics = terag.retrieve("What is their cashflow strategy?")
+# Will match "cashflow" to "cash flow" concept via semantic similarity
+```
+
+#### Setting Embedding Manager at Graph Creation
+
+**Critical**: The embedding model must be provided when creating the graph, not just during retrieval:
+
+```python
+# ✅ CORRECT: Embedding model provided at graph creation
+terag = TERAG.from_chunks(
+    chunks,
+    config=config,
+    embedding_model=embedding_manager  # Embeddings computed here
+)
+
+# ❌ INCORRECT: Cannot add embedding model later
+terag = TERAG.from_chunks(chunks, config=config)  # No embeddings!
+# terag.embedding_model = embedding_manager  # Too late!
+```
+
+This is because TERAG pre-computes concept embeddings during graph construction for efficiency.
+
+#### Loading from Saved Graph
+
+When loading a pre-built graph, you still need to provide the embedding model:
+
+```python
+# Load graph from file
+terag = TERAG.from_graph_file(
+    "terag_graph.json",
+    config=config,
+    embedding_model=embedding_manager  # Still required!
+)
+```
+
+### Threshold Configuration
+
+The `semantic_match_threshold` controls how similar an entity and concept must be to match:
+
+| Use Case | Threshold | Behavior |
+|----------|-----------|----------|
+| **High Precision** (legal, medical) | `0.85` | Only very similar matches |
+| **Balanced** (general Q&A) | `0.70` | Good precision/recall balance (default) |
+| **High Recall** (exploratory search) | `0.60` | Cast wider net, more matches |
+
+```python
+# High precision example
+config = TERAGConfig(
+    semantic_match_threshold=0.85  # Stricter matching
+)
+
+# High recall example
+config = TERAGConfig(
+    semantic_match_threshold=0.60  # More lenient matching
+)
+```
+
+### Disabling Semantic Matching
+
+If you prefer text-only matching or don't have an embedding model:
+
+```python
+config = TERAGConfig(
+    use_semantic_entity_matching=False  # Disable semantic matching
+)
+
+terag = TERAG.from_chunks(
+    chunks,
+    config=config
+    # No embedding_model needed
+)
+```
+
+### Debugging and Logging
+
+To see which matching strategies are being used:
+
+```python
+import logging
+
+# Enable debug logging
+logging.basicConfig(level=logging.DEBUG)
+
+terag = TERAG.from_chunks(chunks, config=config, embedding_model=embedding_manager)
+results, metrics = terag.retrieve("What is their cashflow strategy?")
+
+# Output will show:
+# DEBUG: Entity 'cashflow' matched 1 concepts using strategies: semantic
+# DEBUG: Entity 'strategy' matched 2 concepts using strategies: exact, partial
+```
+
+### Performance Considerations
+
+- **Minimal overhead**: Concept embeddings are pre-computed during graph creation
+- **Query-time cost**: Only entity embeddings (typically 2-5 per query) are computed on-the-fly
+- **Typical overhead**: < 50ms per query
+- **Memory**: No additional memory beyond pre-computed concept embeddings
+
+### Supported Embedding Models
+
+TERAG works with any embedding model that has an `encode()` method:
+
+**OpenAI (via EmbeddingManager)**:
+```python
+from terag.embeddings.manager import EmbeddingManager
+
+embedding_manager = EmbeddingManager(
+    api_key=your_key,
+    model="text-embedding-3-small"  # or "text-embedding-3-large"
+)
+```
+
+**SentenceTransformers (local, no API key needed)**:
+```python
+from sentence_transformers import SentenceTransformer
+
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+terag = TERAG.from_chunks(chunks, config=config, embedding_model=embedding_model)
+```
+
+**Other models**: Any model with an `encode(texts: List[str]) -> np.ndarray` method.
+
+### Complete Example
+
+```python
+import os
+from terag import TERAG, TERAGConfig
+from terag.embeddings.manager import EmbeddingManager
+
+# Sample documents
+chunks = [
+    {"content": "The company's cash flow improved significantly in Q4 2024.", "metadata": {"source": "report"}},
+    {"content": "Artificial intelligence investments drove revenue growth.", "metadata": {"source": "report"}},
+    {"content": "The CEO announced a new strategic initiative.", "metadata": {"source": "news"}}
+]
+
+# Setup embedding manager
+embedding_manager = EmbeddingManager(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Configure with semantic matching
+config = TERAGConfig(
+    use_semantic_entity_matching=True,
+    semantic_match_threshold=0.7,
+    top_k=5,
+    min_concept_freq=1  # Lower threshold for small datasets
+)
+
+# Create TERAG with embeddings
+terag = TERAG.from_chunks(
+    chunks,
+    config=config,
+    embedding_model=embedding_manager,
+    verbose=True
+)
+
+# Test semantic matching capabilities
+queries = [
+    "What is their cashflow strategy?",  # "cashflow" → "cash flow" (spelling)
+    "Tell me about AI investments",      # "AI" → "artificial intelligence" (abbreviation)
+    "What did the chief executive say?"  # "chief executive" → "CEO" (synonym)
+]
+
+for query in queries:
+    print(f"\nQuery: {query}")
+    results, metrics = terag.retrieve(query, verbose=True)
+    print(f"Found {len(results)} results")
+    if results:
+        print(f"Top result: {results[0].content[:100]}...")
+```
+
+### Best Practices
+
+1. **Always provide embedding model at graph creation**, not later
+2. **Start with default threshold (0.7)** and adjust based on results
+3. **Enable debug logging** during development to understand matching behavior
+4. **Use higher thresholds (0.85+)** for domains requiring high precision
+5. **Consider local models** (SentenceTransformers) if API costs are a concern
+6. **Test with your specific domain** - threshold effectiveness varies by use case
 ## Architecture
 
 ### 1. Graph Construction
