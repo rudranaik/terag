@@ -9,6 +9,8 @@ Complete TERAG retrieval system integrating:
 """
 
 import json
+import os
+import logging
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import time
@@ -17,6 +19,8 @@ from terag.graph.builder import TERAGGraph, GraphBuilder
 from terag.ingestion.ner_extractor import NERExtractor, extract_concepts_from_text
 from terag.ingestion.query_ner import ImprovedQueryNER
 from terag.retrieval.ppr import TERAGRetriever as PPRRetriever, RetrievalResult, RetrievalMetrics
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -37,6 +41,7 @@ class TERAGConfig:
 
     # Retrieval
     top_k: int = 10
+    default_retrieval_method: str = "ppr"  # "ppr", "semantic", or "hybrid"
 
     # Semantic entity matching
     use_semantic_entity_matching: bool = True  # Enable semantic similarity-based entity matching
@@ -74,18 +79,52 @@ class TERAG:
         self.config = config
         self.embedding_model = embedding_model
 
-        # Initialize components
-        # Initialize components
+        # Initialize LLM-based query NER with better error handling
+        self.query_ner = None
+        if config.use_llm_for_ner:
+            try:
+                api_key = config.llm_api_key or os.getenv(
+                    "GROQ_API_KEY" if config.llm_provider == "groq" else "OPENAI_API_KEY"
+                )
+                
+                if not api_key:
+                    logger.warning(
+                        f"LLM-based NER requested but no API key found. "
+                        f"Please set {config.llm_provider.upper()}_API_KEY environment variable "
+                        f"or pass llm_api_key in config. Falling back to regex-based NER."
+                    )
+                    self.query_ner = None
+                else:
+                    self.query_ner = ImprovedQueryNER(
+                        use_llm=True,
+                        provider=config.llm_provider,
+                        api_key=api_key
+                    )
+                    logger.info(f"Initialized LLM-based query NER using {config.llm_provider}")
+                    
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize LLM-based NER: {e}. "
+                    f"Falling back to regex-based NER."
+                )
+                self.query_ner = None
+        
+        # If LLM NER failed or not requested, use regex-based fallback
+        if self.query_ner is None:
+            self.query_ner = ImprovedQueryNER(
+                use_llm=False,
+                provider=config.llm_provider,
+                api_key=None
+            )
+
+        # Initialize NER extractor (for graph building)
         self.ner_extractor = NERExtractor(
             use_llm=config.use_llm_for_ner, 
             provider=config.llm_provider,
             api_key=config.llm_api_key
         )
-        self.query_ner = ImprovedQueryNER(
-            use_llm=config.use_llm_for_ner,
-            provider=config.llm_provider,
-            api_key=config.llm_api_key
-        )
+        
+        # Initialize PPR retriever
         self.retriever = PPRRetriever(
             graph=graph,
             embedding_model=embedding_model,
@@ -94,6 +133,10 @@ class TERAG:
             use_semantic_matching=config.use_semantic_entity_matching,
             semantic_threshold=config.semantic_match_threshold
         )
+        
+        # Lazy initialization for semantic and hybrid retrievers
+        self._semantic_retriever = None
+        self._hybrid_retriever = None
 
     @classmethod
     def from_chunks(
@@ -311,23 +354,90 @@ class TERAG:
     def retrieve(
         self,
         query: str,
+        method: Optional[str] = None,
         top_k: Optional[int] = None,
+        ppr_weight: float = 0.6,
+        semantic_weight: float = 0.4,
+        min_score_threshold: Optional[float] = None,
         verbose: bool = False
     ) -> Tuple[List[RetrievalResult], RetrievalMetrics]:
         """
-        Retrieve relevant passages for a query
+        Retrieve relevant passages for a query using specified method
 
         Args:
             query: User query
+            method: Retrieval method - "ppr", "semantic", or "hybrid" (default: from config)
             top_k: Number of results (default: from config)
+            ppr_weight: Weight for PPR scores in hybrid retrieval (default: 0.6)
+            semantic_weight: Weight for semantic scores in hybrid retrieval (default: 0.4)
+            min_score_threshold: Minimum score threshold (method-specific)
             verbose: Print progress
 
         Returns:
-            (results, metrics)
+            (results, metrics) tuple
+            
+        Examples:
+            # PPR retrieval (default)
+            results, metrics = terag.retrieve("What is the revenue?")
+            
+            # Semantic retrieval
+            results, metrics = terag.retrieve("What is the revenue?", method="semantic")
+            
+            # Hybrid retrieval
+            results, metrics = terag.retrieve(
+                "What is the revenue?", 
+                method="hybrid",
+                ppr_weight=0.7,
+                semantic_weight=0.3
+            )
         """
         if top_k is None:
             top_k = self.config.top_k
-
+            
+        if method is None:
+            method = self.config.default_retrieval_method
+        
+        # Validate method
+        self._validate_retrieval_method(method)
+        
+        if verbose:
+            print(f"Using {method.upper()} retrieval method")
+        
+        # Route to appropriate retrieval method
+        if method == "ppr":
+            return self._retrieve_ppr(query, top_k, min_score_threshold, verbose)
+        elif method == "semantic":
+            return self._retrieve_semantic(query, top_k, min_score_threshold, verbose)
+        elif method == "hybrid":
+            return self._retrieve_hybrid(
+                query, top_k, ppr_weight, semantic_weight, min_score_threshold, verbose
+            )
+        else:
+            raise ValueError(f"Invalid retrieval method: {method}")
+    
+    def _validate_retrieval_method(self, method: str) -> None:
+        """Validate retrieval method and check prerequisites"""
+        valid_methods = ["ppr", "semantic", "hybrid"]
+        if method not in valid_methods:
+            raise ValueError(
+                f"Invalid retrieval method '{method}'. "
+                f"Must be one of: {', '.join(valid_methods)}"
+            )
+        
+        if method in ["semantic", "hybrid"] and self.embedding_model is None:
+            raise ValueError(
+                f"Retrieval method '{method}' requires an embedding model. "
+                f"Please provide embedding_model when creating TERAG instance."
+            )
+    
+    def _retrieve_ppr(
+        self,
+        query: str,
+        top_k: int,
+        min_score_threshold: Optional[float],
+        verbose: bool
+    ) -> Tuple[List[RetrievalResult], RetrievalMetrics]:
+        """PPR retrieval implementation"""
         # Extract query entities
         query_entities = self.query_ner.extract_query_entities(query, verbose=verbose)
 
@@ -340,7 +450,154 @@ class TERAG:
             frequency_weight=self.config.frequency_weight,
             verbose=verbose
         )
+        
+        # Apply threshold if specified
+        if min_score_threshold is not None:
+            results = [r for r in results if r.score >= min_score_threshold]
 
+        return results, metrics
+    
+    def _retrieve_semantic(
+        self,
+        query: str,
+        top_k: int,
+        min_score_threshold: Optional[float],
+        verbose: bool
+    ) -> Tuple[List[RetrievalResult], RetrievalMetrics]:
+        """Semantic retrieval implementation"""
+        # Lazy initialize semantic retriever
+        if self._semantic_retriever is None:
+            from terag.retrieval.semantic import SemanticRetriever
+            from terag.embeddings.manager import EmbeddingManager
+            
+            # Ensure we have an embedding manager
+            if not isinstance(self.embedding_model, EmbeddingManager):
+                # Wrap in EmbeddingManager if needed
+                embedding_manager = EmbeddingManager()
+                embedding_manager.model = self.embedding_model
+            else:
+                embedding_manager = self.embedding_model
+            
+            self._semantic_retriever = SemanticRetriever(
+                embedding_manager=embedding_manager,
+                min_similarity_threshold=min_score_threshold or 0.5
+            )
+            self._semantic_retriever.load_passage_embeddings(self.graph)
+            
+            if verbose:
+                print(f"Initialized semantic retriever with {len(self.graph.passages)} passages")
+        
+        # Process query
+        from terag.retrieval.query_processor import QueryProcessor
+        query_processor = QueryProcessor(embedding_manager=self._semantic_retriever.embedding_manager)
+        query_processor.load_graph_entities(self.graph)
+        processed_query = query_processor.process_query(query)
+        
+        # Retrieve
+        start_time = time.time()
+        passages = self._semantic_retriever.retrieve_passages(
+            processed_query=processed_query,
+            top_k=top_k
+        )
+        retrieval_time = time.time() - start_time
+        
+        # Convert to RetrievalResult format
+        results = []
+        for passage_id, score in passages:
+            passage = self.graph.passages.get(passage_id)
+            if passage:
+                results.append(RetrievalResult(
+                    passage_id=passage_id,
+                    content=passage.content,
+                    score=score,
+                    matched_concepts=[],  # Semantic doesn't use concept matching
+                    metadata=passage.metadata
+                ))
+        
+        metrics = RetrievalMetrics(
+            num_query_entities=0,
+            num_matched_concepts=0,
+            ppr_iterations=0,  # Not applicable for semantic retrieval
+            retrieval_time=retrieval_time,
+            num_results=len(results)
+        )
+        
+        return results, metrics
+    
+    def _retrieve_hybrid(
+        self,
+        query: str,
+        top_k: int,
+        ppr_weight: float,
+        semantic_weight: float,
+        min_score_threshold: Optional[float],
+        verbose: bool
+    ) -> Tuple[List[RetrievalResult], RetrievalMetrics]:
+        """Hybrid retrieval implementation"""
+        # Lazy initialize hybrid retriever
+        if self._hybrid_retriever is None:
+            from terag.retrieval.hybrid import HybridRetriever
+            from terag.embeddings.manager import EmbeddingManager
+            
+            # Ensure we have an embedding manager
+            if not isinstance(self.embedding_model, EmbeddingManager):
+                embedding_manager = EmbeddingManager()
+                embedding_manager.model = self.embedding_model
+            else:
+                embedding_manager = self.embedding_model
+            
+            self._hybrid_retriever = HybridRetriever(
+                graph=self.graph,
+                embedding_manager=embedding_manager,
+                ppr_weight=ppr_weight,
+                semantic_weight=semantic_weight,
+                use_llm_for_ner=self.config.use_llm_for_ner,
+                llm_provider=self.config.llm_provider,
+                llm_api_key=self.config.llm_api_key
+            )
+            
+            if verbose:
+                print(f"Initialized hybrid retriever (PPR: {ppr_weight}, Semantic: {semantic_weight})")
+        
+        # Retrieve
+        start_time = time.time()
+        hybrid_results, analysis = self._hybrid_retriever.retrieve(
+            query=query,
+            top_k=top_k,
+            enable_analysis=verbose
+        )
+        retrieval_time = time.time() - start_time
+        
+        # Apply threshold if specified
+        if min_score_threshold is not None:
+            hybrid_results = [r for r in hybrid_results if r.hybrid_score >= min_score_threshold]
+        
+        # Convert to RetrievalResult format
+        results = []
+        for hr in hybrid_results:
+            results.append(RetrievalResult(
+                passage_id=hr.passage_id,
+                content=hr.content,
+                score=hr.hybrid_score,
+                matched_concepts=hr.entity_matches or [],
+                metadata=hr.metadata or {}
+            ))
+        
+        metrics = RetrievalMetrics(
+            num_query_entities=0,
+            num_matched_concepts=len(set(sum([r.entity_matches or [] for r in hybrid_results], []))),
+            ppr_iterations=0,  # Not directly tracked in hybrid mode
+            retrieval_time=retrieval_time,
+            num_results=len(results)
+        )
+        
+        if verbose and analysis:
+            print(f"\nHybrid Retrieval Analysis:")
+            print(f"  Total results: {analysis.total_results}")
+            print(f"  PPR-only: {analysis.ppr_only_results}")
+            print(f"  Semantic-only: {analysis.semantic_only_results}")
+            print(f"  Combined: {analysis.combined_results}")
+        
         return results, metrics
 
     def save_graph(self, filepath: str):

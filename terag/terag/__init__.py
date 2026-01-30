@@ -7,4 +7,4 @@ from terag.core import TERAG, TERAGConfig
 
 __all__ = ["TERAG", "TERAGConfig"]
 
-__version__ = "0.6.0"
+__version__ = "0.8.0"

@@ -7,6 +7,7 @@ reasoning and semantic similarity matching.
 """
 
 import logging
+import os
 from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 import numpy as np
@@ -65,6 +66,9 @@ class HybridRetriever:
         embedding_manager: EmbeddingManager,
         ppr_weight: float = 0.6,
         semantic_weight: float = 0.4,
+        use_llm_for_ner: bool = False,
+        llm_provider: str = "groq",
+        llm_api_key: Optional[str] = None,
         score_fusion_method: str = "weighted_sum",  # "weighted_sum", "max", "harmonic_mean"
         min_ppr_score: float = 1e-6,
         min_semantic_score: float = 0.3,
@@ -78,6 +82,9 @@ class HybridRetriever:
             embedding_manager: Pre-configured embedding manager
             ppr_weight: Weight for PPR scores in fusion
             semantic_weight: Weight for semantic scores in fusion
+            use_llm_for_ner: Whether to use LLM-based NER for query processing
+            llm_provider: LLM provider ("groq" or "openai")
+            llm_api_key: Optional API key override
             score_fusion_method: Method to combine scores
             min_ppr_score: Minimum PPR score threshold
             min_semantic_score: Minimum semantic score threshold
@@ -91,16 +98,49 @@ class HybridRetriever:
         self.min_ppr_score = min_ppr_score
         self.min_semantic_score = min_semantic_score
         self.result_diversification = result_diversification
+        self.use_llm_for_ner = use_llm_for_ner
         
         # Initialize components
         logger.info("Initializing hybrid retrieval components...")
         
-        # Query processor
-        self.query_processor = QueryProcessor(
-            embedding_manager=embedding_manager,
-            entity_similarity_threshold=0.7
-        )
-        self.query_processor.load_graph_entities(graph)
+        # Query processor - use LLM-based if configured
+        if use_llm_for_ner:
+            try:
+                from terag.ingestion.query_ner import ImprovedQueryNER
+                
+                api_key = llm_api_key or os.getenv(
+                    "GROQ_API_KEY" if llm_provider == "groq" else "OPENAI_API_KEY"
+                )
+                
+                if not api_key:
+                    logger.warning(
+                        f"LLM-based NER requested but no API key found. "
+                        f"Falling back to embedding-based query processor."
+                    )
+                    self.query_ner = None
+                else:
+                    self.query_ner = ImprovedQueryNER(
+                        use_llm=True,
+                        provider=llm_provider,
+                        api_key=api_key
+                    )
+                    logger.info(f"Using LLM-based query NER ({llm_provider}) for hybrid retrieval")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LLM-based NER: {e}. Falling back to embedding-based.")
+                self.query_ner = None
+        else:
+            self.query_ner = None
+        
+        # Fallback to embedding-based query processor if LLM not available
+        if self.query_ner is None:
+            self.query_processor = QueryProcessor(
+                embedding_manager=embedding_manager,
+                entity_similarity_threshold=0.7
+            )
+            self.query_processor.load_graph_entities(graph)
+            logger.info("Using embedding-based query processor for hybrid retrieval")
+        else:
+            self.query_processor = None
         
         # PPR retriever (using existing implementation)
         self.ppr_retriever = PPRRetriever(graph, alpha=0.15)
@@ -118,7 +158,8 @@ class HybridRetriever:
             "avg_ppr_results": 0,
             "avg_semantic_results": 0,
             "avg_combined_results": 0,
-            "fusion_method_used": score_fusion_method
+            "fusion_method_used": score_fusion_method,
+            "using_llm_ner": use_llm_for_ner and self.query_ner is not None
         }
         
         logger.info("Hybrid retriever initialized successfully")
@@ -147,14 +188,32 @@ class HybridRetriever:
         logger.info(f"Hybrid retrieval for query: '{query}'")
         
         # Step 1: Process query
-        processed_query = self.query_processor.process_query(query)
-        logger.info(f"Query processing: {len(processed_query.extracted_entities)} entities extracted, "
-                   f"confidence: {processed_query.confidence_score:.3f}")
+        if self.query_ner is not None:
+            # Use LLM-based NER
+            query_entities = self.query_ner.extract_query_entities(query, verbose=False)
+            
+            # Generate query embedding for semantic retrieval
+            query_embedding = self.embedding_manager.embed_text(query)
+            
+            # Create a simple processed query object for compatibility
+            processed_query = ProcessedQuery(
+                original_query=query,
+                cleaned_query=query,
+                extracted_entities=[],
+                query_embedding=query_embedding,
+                confidence_score=0.8 if query_entities else 0.5
+            )
+            logger.info(f"Query processing (LLM-based): {len(query_entities)} entities extracted")
+        else:
+            # Use embedding-based query processor
+            processed_query = self.query_processor.process_query(query)
+            query_entities = [entity.entity_text for entity in processed_query.extracted_entities]
+            logger.info(f"Query processing (embedding-based): {len(query_entities)} entities extracted, "
+                       f"confidence: {processed_query.confidence_score:.3f}")
         
         # Step 2: Run PPR retrieval
         ppr_results = []
-        if processed_query.extracted_entities:
-            query_entities = [entity.entity_text for entity in processed_query.extracted_entities]
+        if query_entities:
             ppr_results, ppr_metrics = self.ppr_retriever.retrieve(
                 query=query,
                 query_entities=query_entities,

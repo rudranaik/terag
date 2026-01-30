@@ -96,6 +96,72 @@ class TERAGGraph:
         """Get all passage neighbors of a concept with weights"""
         return self.concept_to_passages.get(concept_id, {})
 
+    def get_passage(self, passage_id: str) -> Optional[PassageNode]:
+        """
+        Get passage node by ID
+        
+        Args:
+            passage_id: Passage identifier
+            
+        Returns:
+            PassageNode or None if not found
+        """
+        return self.passages.get(passage_id)
+
+    def get_concept(self, concept_id: str) -> Optional[ConceptNode]:
+        """
+        Get concept node by ID
+        
+        Args:
+            concept_id: Concept identifier
+            
+        Returns:
+            ConceptNode or None if not found
+        """
+        return self.concepts.get(concept_id)
+
+    def get_passage_content(self, passage_id: str) -> Optional[str]:
+        """
+        Get passage content by ID
+        
+        Args:
+            passage_id: Passage identifier
+            
+        Returns:
+            Passage content string or None if not found
+        """
+        passage = self.passages.get(passage_id)
+        return passage.content if passage else None
+
+    def list_passages(self) -> List[str]:
+        """Get list of all passage IDs"""
+        return list(self.passages.keys())
+
+    def list_concepts(self) -> List[str]:
+        """Get list of all concept IDs"""
+        return list(self.concepts.keys())
+
+    def search_concepts(self, query: str, case_sensitive: bool = False) -> List[ConceptNode]:
+        """
+        Search for concepts by text match
+        
+        Args:
+            query: Search query
+            case_sensitive: Whether to match case
+            
+        Returns:
+            List of matching ConceptNode objects
+        """
+        if not case_sensitive:
+            query = query.lower()
+        
+        matches = []
+        for concept in self.concepts.values():
+            text = concept.concept_text if case_sensitive else concept.concept_text.lower()
+            if query in text:
+                matches.append(concept)
+        return matches
+
     def get_statistics(self) -> Dict:
         """Return graph statistics"""
         total_edges = sum(len(concepts) for concepts in self.passage_to_concepts.values())

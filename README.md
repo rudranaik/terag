@@ -374,39 +374,85 @@ cd terag
 pip install -e .
 ```
 
+## Environment Variables
+
+TERAG uses the following environment variables for optional LLM-based features:
+
+| Variable | Purpose | Required For | How to Get |
+|----------|---------|--------------|------------|
+| `GROQ_API_KEY` | Groq LLM API access | LLM-based NER (default provider) | [Get free API key](https://console.groq.com) |
+| `OPENAI_API_KEY` | OpenAI API access | LLM-based NER, embeddings | [Get API key](https://platform.openai.com/api-keys) |
+
+**Setup:**
+
+```bash
+# Option 1: Export in your shell
+export GROQ_API_KEY="your_groq_key_here"
+export OPENAI_API_KEY="your_openai_key_here"
+
+# Option 2: Create a .env file in your project root
+echo "GROQ_API_KEY=your_groq_key_here" >> .env
+echo "OPENAI_API_KEY=your_openai_key_here" >> .env
+```
+
+> [!NOTE]
+> **LLM-based NER is optional**. TERAG will automatically fall back to regex-based entity extraction if no API key is provided. LLM-based NER provides higher accuracy but incurs API costs.
+
+> [!TIP]
+> **Groq is recommended** for LLM-based NER as it offers fast inference and generous free tier limits.
+
 ## Quick Start
 
 Get started with TERAG in 3 simple steps:
 
-### 1. Setup
-Ensure you have your API keys set (if using LLM features):
+### 1. Installation
 ```bash
-export GROQ_API_KEY="your_key_here"  # Optional: for LLM-based NER
-export OPENAI_API_KEY="your_key_here" # Optional: for embeddings/LLM
+pip install terag
 ```
 
-### 2. Basic Usage
+### 2. Basic Usage with Unified Retrieval API
+
 ```python
 from terag import TERAG, TERAGConfig
+from terag.embeddings.manager import EmbeddingManager
+import os
 
-# Define some sample data
-# NOTE: The 'content' key is REQUIRED. It is the only field used for graph construction.
-# 'metadata' is optional and stored but not used for indexing.
+# Define sample data
 chunks = [
     {"content": "Apple Inc announced strong revenue growth in Q4 2024.", "metadata": {"source": "news"}},
     {"content": "Microsoft Corporation reported significant cloud achievements.", "metadata": {"source": "news"}}
 ]
 
+# Setup (optional for semantic/hybrid retrieval)
+embedding_manager = EmbeddingManager(api_key=os.getenv("OPENAI_API_KEY"))
+
 # Initialize TERAG
 config = TERAGConfig(top_k=3)
-terag = TERAG.from_chunks(chunks, config=config)
+terag = TERAG.from_chunks(chunks, config=config, embedding_model=embedding_manager)
 
-# Retrieve
-results, metrics = terag.retrieve("What is the revenue growth?")
+# Method 1: PPR Retrieval (default, graph-based)
+results, metrics = terag.retrieve("What is the revenue growth?", method="ppr")
+
+# Method 2: Semantic Retrieval (embedding-based)
+results, metrics = terag.retrieve("What is the revenue growth?", method="semantic")
+
+# Method 3: Hybrid Retrieval (combines both)
+results, metrics = terag.retrieve(
+    "What is the revenue growth?", 
+    method="hybrid",
+    ppr_weight=0.6,  # Weight for graph-based scores
+    semantic_weight=0.4  # Weight for semantic scores
+)
 
 # Inspect results
 for result in results:
     print(f"Score: {result.score:.4f} | Content: {result.content}")
+```
+
+**Backward Compatibility:**
+```python
+# This still works (defaults to PPR)
+results, metrics = terag.retrieve("What is the revenue growth?")
 ```
 
 ### 3. Visualization & Export
@@ -422,7 +468,79 @@ G = terag.graph.to_networkx()
 nx.write_graphml(G, "terag_graph.graphml")
 ```
 
-### 4. Advanced Usage
+## Retrieval Methods
+
+TERAG supports three retrieval methods, each with different strengths:
+
+| Method | Best For | Requires Embeddings | Speed | Accuracy |
+|--------|----------|---------------------|-------|----------|
+| **PPR** | Entity-centric queries, multi-hop reasoning | No | Fast | High for entity queries |
+| **Semantic** | Conceptual queries, paraphrases | Yes | Medium | High for semantic similarity |
+| **Hybrid** | General-purpose, best overall performance | Yes | Medium | Highest (combines both) |
+
+### When to Use Each Method
+
+**PPR (Personalized PageRank)**:
+- Queries with specific entities: "What did Apple announce?"
+- Multi-hop reasoning: "Which companies mentioned by the CEO have partnerships?"
+- When you don't have embedding models available
+
+**Semantic**:
+- Conceptual queries: "What are the main challenges discussed?"
+- Paraphrased queries: "revenue growth" vs "income increase"
+- When entity extraction might miss relevant content
+
+**Hybrid** (Recommended):
+- General-purpose retrieval
+- When you want the best of both approaches
+- Production applications where accuracy matters most
+
+### Example Comparison
+
+```python
+query = "What are the financial results?"
+
+# PPR: Finds passages with entities like "revenue", "profit", "Q4"
+ppr_results, _ = terag.retrieve(query, method="ppr")
+
+# Semantic: Finds passages semantically similar to "financial results"
+sem_results, _ = terag.retrieve(query, method="semantic")
+
+# Hybrid: Combines both approaches for best coverage
+hyb_results, _ = terag.retrieve(query, method="hybrid", ppr_weight=0.6, semantic_weight=0.4)
+```
+
+## Graph Access Convenience Methods
+
+TERAG provides convenient methods to access graph data:
+
+```python
+# Get passage by ID
+passage = terag.graph.get_passage("passage_0")
+print(passage.content)
+
+# Get passage content directly
+content = terag.graph.get_passage_content("passage_0")
+
+# Get concept by ID
+concept = terag.graph.get_concept("revenue")
+print(f"Concept '{concept.concept_text}' appears in {concept.frequency} passages")
+
+# List all passages and concepts
+all_passages = terag.graph.list_passages()
+all_concepts = terag.graph.list_concepts()
+
+# Search for concepts by text
+revenue_concepts = terag.graph.search_concepts("revenue")
+for concept in revenue_concepts:
+    print(f"Found: {concept.concept_text}")
+
+# Get neighbors (related nodes)
+concept_neighbors = terag.graph.get_concept_neighbors("revenue")
+passage_neighbors = terag.graph.get_passage_neighbors("passage_0")
+```
+
+## Advanced Usage
 For more complex scenarios, including custom graph building and hybrid retrieval, check out `terag/examples/example_usage.py`.
 
 ## Contributing
