@@ -50,10 +50,17 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Ensure internal imports are consistently relative inside the package.
   - Acceptance: `python -m venv /tmp/terag-test && pip install . && python -c "import terag; print(terag.__version__)"` works from outside the repo.
 
-- [ ] **Define a small, stable public API.**
+- [x] **Define a small, stable public API.**
   - Export only high-level objects from `terag.__init__`: `TERAG`, config models, result models, provider protocols, and `__version__`.
   - Move lower-level graph/retrieval/ingestion modules behind documented advanced imports or private namespaces.
   - Add `__all__` and an API stability note.
+  - Public top-level exports are now limited to `TERAG`, `TERAGConfig`, `RetrievalResult`, `RetrievalMetrics`, and `__version__`.
+  - `__version__` now resolves from package metadata with a local fallback to avoid drift from `pyproject.toml`.
+  - Added `docs/api-stability.md` documenting stable public imports, advanced imports, compatibility policy, and deprecation policy.
+  - Added tests for public `__all__` and `__version__`.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes.
+    - Built wheel imports from a fresh temporary venv outside the repo and exposes `terag.__version__ == "0.8.0"`.
   - Acceptance: README quickstart uses only public imports.
 
 - [x] **Standardize the core user API around insert/query/retrieve.**
@@ -75,9 +82,14 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
     results = rag.query("What happened to Apple revenue?", top_k=3)
     ```
 
-- [ ] **Add backward-compatibility shims and deprecation policy.**
+- [x] **Add backward-compatibility shims and deprecation policy.**
   - Preserve `from_chunks()`, `from_chunks_file()`, and tuple-return behavior behind opt-in flags or deprecation warnings for at least one minor release.
   - Add a migration guide from current `0.8.x` usage to the new API.
+  - `from_chunks()`, `from_chunks_file()`, `from_graph_file()`, and `retrieve()` tuple behavior remain supported.
+  - Added `docs/migration-0.8.md` showing old `retrieve()` usage, preferred `query()` usage, build-later `insert()` usage, result-object aliases, and logging changes.
+  - Added deprecation policy in `docs/api-stability.md`; no warnings are emitted yet because the old APIs remain supported rather than deprecated.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes, including old tuple-return and new query/insert API tests.
   - Acceptance: existing tests for old API pass while new API tests are added.
 
 - [ ] **Split configuration into focused validated models.**
@@ -190,6 +202,7 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Progress: README has been rewritten into a short install/quickstart/modes/benchmarks page.
   - Progress: moved deeper algorithm and configuration explanation into `docs/technical-overview.md`.
   - Progress: added `docs/retrieval-flow.md` with Mermaid diagrams explaining how PPR, semantic, and hybrid retrieval work after graph construction.
+  - Progress: added `docs/api-stability.md` and `docs/migration-0.8.md` and linked them from README.
   - Still pending: configuration, persistence, integrations, provider setup, index lifecycle, evaluation, troubleshooting, and generated API reference docs.
   - Validation:
     - `.venv/bin/python -m pytest tests` passes.
@@ -240,6 +253,9 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Track retrieval quality, latency, memory, token usage, index build cost, query cost, and update cost.
   - Include HotpotQA or other public datasets with download/build scripts rather than committed generated artifacts.
   - Set up HotPotQA smoke/dev-5pct/full tiers with deterministic sampling manifests, cached/generated artifacts outside git, baseline metrics, and regression comparison.
+  - Added qualitative smoke inspection: `make bench-inspect-smoke` writes `latest_smoke_inspection.md/json` showing each real question, expected supporting chunks, retrieved chunks, ranks, scores, matched concepts, and snippets.
+  - Validation:
+    - `PYTHON=.venv/bin/python make bench-inspect-smoke` passes and writes `benchmarks/hotpotqa/results/latest_smoke_inspection.md`.
   - Acceptance: benchmark results can be reproduced by a new contributor.
 
 - [ ] **Add evaluation hooks.**

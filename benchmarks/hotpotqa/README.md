@@ -37,6 +37,7 @@ From the repository root:
 make bench-sample-smoke
 make bench-sample-hotpotqa-5pct
 make bench-smoke
+make bench-inspect-smoke
 make bench-hotpotqa-5pct
 ```
 
@@ -45,6 +46,7 @@ Or run scripts directly:
 ```bash
 python -m benchmarks.hotpotqa.scripts.sample --config benchmarks/hotpotqa/configs/smoke.json
 python -m benchmarks.hotpotqa.scripts.evaluate --config benchmarks/hotpotqa/configs/smoke.json
+python -m benchmarks.hotpotqa.scripts.inspect --config benchmarks/hotpotqa/configs/smoke.json
 ```
 
 Use `PYTHON=/path/to/python make bench-smoke` if your default interpreter does not have TERAG's dependencies installed.
@@ -63,6 +65,21 @@ The evaluator currently tracks retrieval metrics only:
 - errors and no-entity query count
 
 Answer-generation metrics can be added after the retriever benchmark is stable.
+
+## Qualitative Inspection
+
+Use the inspection command when you want to see the real retrieved chunks, not just aggregate metrics:
+
+```bash
+make bench-inspect-smoke
+```
+
+It writes:
+
+- `benchmarks/hotpotqa/results/latest_smoke_inspection.md`
+- `benchmarks/hotpotqa/results/latest_smoke_inspection.json`
+
+The Markdown report shows each question, the expected supporting chunks from HotPotQA, and TERAG's ranked retrieved chunks with scores, matched concepts, and snippets.
 
 ## Baselines
 

@@ -126,6 +126,8 @@ The benchmark keeps generated data and caches outside git so repeated runs are m
 
 - [Technical overview](/docs/technical-overview.md)
 - [How TERAG retrieval works](/docs/retrieval-flow.md)
+- [API stability](/docs/api-stability.md)
+- [Migration notes from 0.8.x](/docs/migration-0.8.md)
 - [HotPotQA benchmark harness](/benchmarks/hotpotqa/README.md)
 - [Adoption readiness checklist](/TERAG_USABILITY_EVALUATION_AND_PRIORITIZED_CHANGES.md)
 

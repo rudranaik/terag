@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: bench-sample-smoke bench-sample-hotpotqa-5pct bench-smoke bench-hotpotqa-5pct bench-hotpotqa-full bench-compare-smoke bench-compare-hotpotqa-5pct
+.PHONY: bench-sample-smoke bench-sample-hotpotqa-5pct bench-smoke bench-inspect-smoke bench-hotpotqa-5pct bench-hotpotqa-full bench-compare-smoke bench-compare-hotpotqa-5pct
 
 bench-sample-smoke:
 	$(PYTHON) -m benchmarks.hotpotqa.scripts.sample --config benchmarks/hotpotqa/configs/smoke.json
@@ -11,6 +11,10 @@ bench-sample-hotpotqa-5pct:
 bench-smoke:
 	$(PYTHON) -m benchmarks.hotpotqa.scripts.sample --config benchmarks/hotpotqa/configs/smoke.json
 	$(PYTHON) -m benchmarks.hotpotqa.scripts.evaluate --config benchmarks/hotpotqa/configs/smoke.json
+
+bench-inspect-smoke:
+	$(PYTHON) -m benchmarks.hotpotqa.scripts.sample --config benchmarks/hotpotqa/configs/smoke.json
+	$(PYTHON) -m benchmarks.hotpotqa.scripts.inspect --config benchmarks/hotpotqa/configs/smoke.json
 
 bench-hotpotqa-5pct:
 	$(PYTHON) -m benchmarks.hotpotqa.scripts.sample --config benchmarks/hotpotqa/configs/dev_5pct.json

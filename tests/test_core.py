@@ -1,4 +1,5 @@
 import pytest
+import terag as terag_module
 from terag import TERAG, TERAGConfig
 from terag import RetrievalResult, RetrievalMetrics
 
@@ -66,6 +67,16 @@ def test_retrieval_result_public_shape_and_compatibility():
 def test_public_api_exports_result_types():
     assert RetrievalResult.__name__ == "RetrievalResult"
     assert RetrievalMetrics.__name__ == "RetrievalMetrics"
+
+def test_public_api_exports_stable_top_level_names():
+    assert set(terag_module.__all__) == {
+        "TERAG",
+        "TERAGConfig",
+        "RetrievalMetrics",
+        "RetrievalResult",
+        "__version__",
+    }
+    assert terag_module.__version__
 
 def test_terag_config():
     config = TERAGConfig(top_k=5, ppr_alpha=0.2)
