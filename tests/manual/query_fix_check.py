@@ -3,14 +3,11 @@
 Test script to verify the blank query results fix
 """
 import json
-import sys
-import os
 import dotenv
 
 dotenv.load_dotenv()
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _paths import SAMPLE_CHUNKS_PATH
 
 from terag import TERAG, TERAGConfig
 
@@ -21,7 +18,7 @@ def test_query_fix():
     print("="*70)
     
     # Load chunks
-    with open('chunks.json', 'r') as f:
+    with open(SAMPLE_CHUNKS_PATH, 'r') as f:
         chunks = json.load(f)
     
     print(f"Loaded {len(chunks)} chunks")

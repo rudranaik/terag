@@ -3,11 +3,10 @@
 Test script to verify graph persistence improvements
 """
 import json
-import sys
 import os
 import shutil
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _paths import SAMPLE_CHUNKS_PATH
 
 from terag import TERAG, TERAGConfig
 
@@ -24,7 +23,7 @@ def test_persistence():
         os.remove("manual_saved_graph.json")
 
     # Load chunks
-    with open('chunks.json', 'r') as f:
+    with open(SAMPLE_CHUNKS_PATH, 'r') as f:
         chunks = json.load(f)
     
     print("\n--- Test 1: Auto-save Functionality ---")

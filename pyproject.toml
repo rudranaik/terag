@@ -66,6 +66,7 @@ all = [
 
 [tool.setuptools.packages.find]
 where = ["terag"]
+exclude = ["examples*"]
 
 [tool.setuptools.package-dir]
 "" = "terag"

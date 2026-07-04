@@ -1,5 +1,13 @@
 include README.md
 include LICENSE
 include requirements.txt
-recursive-include terag/data *
-recursive-include terag/examples *
+prune tests/manual
+prune hotpotqa_data
+prune .benchmark_data
+prune .benchmark_cache
+prune embeddings_cache
+prune extraction_cache
+prune quick_extraction_cache
+global-exclude __pycache__/*
+global-exclude *.py[cod]
+global-exclude .DS_Store

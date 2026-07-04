@@ -3,10 +3,9 @@
 Test script to verify LLM error message improvements
 """
 import json
-import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _paths import SAMPLE_CHUNKS_PATH
 
 from terag import TERAG, TERAGConfig
 
@@ -17,7 +16,7 @@ def test_llm_errors():
     print("="*70)
     
     # Load chunks
-    with open('chunks.json', 'r') as f:
+    with open(SAMPLE_CHUNKS_PATH, 'r') as f:
         chunks = json.load(f)
     
     print("\n--- Test 1: LLM DISABLED (use_llm_for_ner=False) ---")

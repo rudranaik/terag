@@ -3,10 +3,8 @@
 Test script to verify Multi-LLM support
 """
 import json
-import sys
-import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _paths import SAMPLE_CHUNKS_PATH
 
 from terag import TERAG, TERAGConfig
 
@@ -17,7 +15,7 @@ def test_multi_llm():
     print("="*70)
     
     # Load chunks
-    with open('chunks.json', 'r') as f:
+    with open(SAMPLE_CHUNKS_PATH, 'r') as f:
         chunks = json.load(f)
     
     print("\n--- Test 1: OpenAI Provider (Expect 'Not found' if no key) ---")

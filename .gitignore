@@ -62,5 +62,6 @@ quick_extraction_cache/
 # Benchmark generated artifacts
 .benchmark_data/
 .benchmark_cache/
+hotpotqa_data/
 benchmarks/**/results/*
 !benchmarks/**/results/.gitkeep

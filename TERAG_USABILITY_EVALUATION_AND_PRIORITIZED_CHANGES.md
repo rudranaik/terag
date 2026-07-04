@@ -122,11 +122,22 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
     - `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json` passes against the accepted smoke baseline.
   - Acceptance: quickstart output is controlled by the caller, not the library.
 
-- [ ] **Clean repository and distribution contents.**
+- [x] **Clean repository and distribution contents.**
   - Move root-level test scripts into `tests/` or `benchmarks/`.
   - Move HotpotQA and generated graph files into `benchmarks/data/`, `examples/data/`, or external download scripts.
   - Remove `dist/`, egg-info, caches, local virtualenvs, and generated extraction/embedding caches from version control.
   - Update `.gitignore`, `MANIFEST.in`, and package-data settings.
+  - Moved legacy root-level check scripts into `tests/manual/` with non-pytest filenames and a README explaining they are manual checks.
+  - Moved sample `chunks.json` into `examples/data/chunks.json` and updated manual checks to reference the new path.
+  - Moved the package-adjacent `terag/examples/example_usage.py` into repository-level `examples/example_usage.py` so it is not packaged as a top-level `examples` module.
+  - Added `hotpotqa_data/` to `.gitignore` so local/generated HotPotQA source data stays outside git.
+  - Updated `MANIFEST.in` and package discovery to keep manual tests, benchmark data, caches, and examples out of the wheel.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes and collects only the active 19-test suite.
+    - `.venv/bin/python -m py_compile tests/manual/*.py` passes for moved manual checks.
+    - `.venv/bin/python -m pip wheel . -w /tmp/terag-wheel-check-final --no-deps --no-cache-dir` builds successfully.
+    - Wheel inspection shows no `examples/`, `tests/`, `benchmarks/`, or `hotpotqa_data/` entries.
+    - `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json` passes against the accepted smoke baseline.
   - Acceptance: built wheel contains only package code, license/readme metadata, and intentional package assets.
 
 ### P1 - High: Swappability, Index Lifecycle, and Developer Experience

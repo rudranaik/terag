@@ -3,11 +3,9 @@
 Test script to reproduce TERAG usability issues
 """
 import json
-import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _paths import SAMPLE_CHUNKS_PATH
 
 from terag import TERAG, TERAGConfig
 
@@ -18,7 +16,7 @@ def test_issue_1_graph_persistence():
     print("="*70)
     
     # Load chunks
-    with open('chunks.json', 'r') as f:
+    with open(SAMPLE_CHUNKS_PATH, 'r') as f:
         chunks = json.load(f)
     
     print(f"Loaded {len(chunks)} chunks")
@@ -48,7 +46,7 @@ def test_issue_2_llm_not_found():
     print("="*70)
     
     # Load chunks
-    with open('chunks.json', 'r') as f:
+    with open(SAMPLE_CHUNKS_PATH, 'r') as f:
         chunks = json.load(f)
     
     # Test with LLM enabled
