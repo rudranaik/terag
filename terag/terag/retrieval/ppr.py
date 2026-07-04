@@ -26,6 +26,41 @@ class RetrievalResult:
     matched_concepts: List[str] = field(default_factory=list)
     metadata: Dict = field(default_factory=dict)
 
+    @property
+    def id(self) -> str:
+        """Stable result identifier alias."""
+        return self.passage_id
+
+    @property
+    def text(self) -> str:
+        """Text/content alias for compatibility with common retriever APIs."""
+        return self.content
+
+    def to_dict(self) -> Dict:
+        """Serialize result using the normalized public result shape."""
+        return {
+            "id": self.id,
+            "passage_id": self.passage_id,
+            "content": self.content,
+            "text": self.text,
+            "score": self.score,
+            "metadata": self.metadata,
+            "matched_concepts": self.matched_concepts,
+        }
+
+    def to_document(self) -> Dict:
+        """Return a minimal Document-like dictionary."""
+        return {
+            "page_content": self.content,
+            "metadata": {
+                **self.metadata,
+                "id": self.id,
+                "passage_id": self.passage_id,
+                "score": self.score,
+                "matched_concepts": self.matched_concepts,
+            },
+        }
+
 
 @dataclass
 class RetrievalMetrics:

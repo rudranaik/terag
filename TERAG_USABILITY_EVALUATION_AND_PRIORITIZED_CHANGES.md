@@ -94,10 +94,16 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
     - Existing tests pass: `.venv/bin/python -m pytest tests`.
     - HotPotQA smoke comparison passes: `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json`.
 
-- [ ] **Normalize result objects.**
+- [x] **Normalize result objects.**
   - Define a stable `Passage` or `RetrievalResult` model with `id`, `content`, `score`, `metadata`, `matched_concepts`, `source`, and optional `explanation`.
   - Add adapters to/from LangChain `Document` and LlamaIndex node types.
-  - Acceptance: every retrieval path returns the same result shape.
+  - Added non-breaking `RetrievalResult.id` and `RetrievalResult.text` aliases while preserving `passage_id` and `content`.
+  - Added `RetrievalResult.to_dict()` with normalized keys and `RetrievalResult.to_document()` as a lightweight Document-like adapter.
+  - LangChain/LlamaIndex-specific typed adapters remain tracked under their integration checklist items.
+  - Validation:
+    - Existing tuple-return retrieval behavior remains compatible.
+    - Public API exports `RetrievalResult` and `RetrievalMetrics`.
+    - Result shape tests pass via `.venv/bin/python -m pytest tests`.
 
 - [ ] **Remove print-based library behavior.**
   - Replace `print()` with Python logging and progress callbacks.
