@@ -420,9 +420,11 @@ class NERExtractor:
         words = re.findall(r'\b[a-zA-Z]{6,}\b', text)
         word_freq = Counter(w.lower() for w in words)
 
-        # Keep terms that appear 2+ times and aren't stopwords
+        # Keep meaningful terms even when they appear once. Single-passage and
+        # small-corpus fallback mode otherwise drops important query anchors
+        # such as "revenue" or "cloud".
         for word, freq in word_freq.items():
-            if freq >= 2 and word.lower() not in self.stopwords:
+            if word.lower() not in self.stopwords:
                 concepts.append(word)
 
         # Deduplicate and normalize

@@ -59,3 +59,8 @@ extraction_cache/
 retrieval_results/
 quick_extraction_cache/
 
+# Benchmark generated artifacts
+.benchmark_data/
+.benchmark_cache/
+benchmarks/**/results/*
+!benchmarks/**/results/.gitkeep

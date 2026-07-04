@@ -69,7 +69,7 @@ class EmbeddingManager:
         
         # Setup caching
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(exist_ok=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # Cache files
         self.embeddings_cache_file = self.cache_dir / "embeddings_cache.pkl"

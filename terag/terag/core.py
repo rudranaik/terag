@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import time
 
 from terag.graph.builder import TERAGGraph, GraphBuilder
-from terag.ingestion.ner_extractor import NERExtractor, extract_concepts_from_text
+from terag.ingestion.ner_extractor import NERExtractor
 from terag.ingestion.query_ner import ImprovedQueryNER
 from terag.retrieval.ppr import TERAGRetriever as PPRRetriever, RetrievalResult, RetrievalMetrics
 
@@ -50,7 +50,9 @@ class TERAGConfig:
     # Optional LLM for enhanced NER
     use_llm_for_ner: bool = False
     llm_provider: str = "groq"  # "groq" or "openai"
+    llm_model: Optional[str] = None
     llm_api_key: Optional[str] = None  # Override env var
+    extraction_cache_dir: str = "extraction_cache"
     
     # Graph persistence
     auto_save_graph: bool = False
@@ -98,7 +100,8 @@ class TERAG:
                     self.query_ner = ImprovedQueryNER(
                         use_llm=True,
                         provider=config.llm_provider,
-                        api_key=api_key
+                        api_key=api_key,
+                        model=config.llm_model
                     )
                     logger.info(f"Initialized LLM-based query NER using {config.llm_provider}")
                     
@@ -119,9 +122,11 @@ class TERAG:
 
         # Initialize NER extractor (for graph building)
         self.ner_extractor = NERExtractor(
+            cache_dir=config.extraction_cache_dir,
             use_llm=config.use_llm_for_ner, 
             provider=config.llm_provider,
-            api_key=config.llm_api_key
+            api_key=config.llm_api_key,
+            model=config.llm_model
         )
         
         # Initialize PPR retriever
@@ -168,6 +173,8 @@ class TERAG:
             print(f"  LLM-based NER: {'ENABLED' if config.use_llm_for_ner else 'DISABLED (using regex fallback)'}")
             if config.use_llm_for_ner:
                 print(f"  Provider: {config.llm_provider}")
+                if config.llm_model:
+                    print(f"  Model: {config.llm_model}")
                 
                 # Check for appropriate API key
                 import os
@@ -214,9 +221,18 @@ class TERAG:
             enable_concept_clustering=config.enable_concept_clustering
         )
 
+        graph_ner_extractor = NERExtractor(
+            cache_dir=config.extraction_cache_dir,
+            use_llm=config.use_llm_for_ner,
+            provider=config.llm_provider,
+            api_key=config.llm_api_key,
+            model=config.llm_model,
+            enable_progress_reporting=verbose
+        )
+
         graph = builder.build_graph_from_chunks(
             chunks=chunks,
-            extract_concepts_fn=extract_concepts_from_text
+            extract_concepts_fn=graph_ner_extractor.extract_entities_and_concepts
         )
 
         build_time = time.time() - start_time

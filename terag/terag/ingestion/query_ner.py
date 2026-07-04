@@ -31,7 +31,8 @@ class ImprovedQueryNER:
         use_llm: bool = True,
         # New args
         provider: str = "groq",
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        model: Optional[str] = None
     ):
         """
         Initialize QueryNER
@@ -47,6 +48,7 @@ class ImprovedQueryNER:
                 self.llm_provider = get_llm_provider(
                     provider_name=provider,
                     api_key=effective_api_key,
+                    model=model,
                     silent_fallback=not use_llm
                 )
                 

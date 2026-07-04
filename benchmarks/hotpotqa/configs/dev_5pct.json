@@ -1,0 +1,43 @@
+{
+  "dataset": "hotpotqa",
+  "split": "validation",
+  "sample_name": "dev_5pct",
+  "seed": 42,
+  "source_data_dir": "hotpotqa_data",
+  "output_root": ".benchmark_data/hotpotqa",
+  "manifest_copy_path": "benchmarks/hotpotqa/manifests/dev_5pct_seed42.json",
+  "target_qa_count": 400,
+  "target_passage_count": 3000,
+  "retrieval": {
+    "method": "ppr",
+    "top_k": 10,
+    "hit_ks": [1, 3, 5, 10]
+  },
+  "terag_config": {
+    "use_llm_for_ner": true,
+    "min_concept_freq": 1,
+    "top_k": 10,
+    "llm_provider": "openai",
+    "llm_model": "gpt-5-nano",
+    "extraction_cache_dir": ".benchmark_cache/hotpotqa/dev_5pct/extraction",
+    "use_semantic_entity_matching": true
+  },
+  "embedding_model": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "cache_dir": ".benchmark_cache/hotpotqa/dev_5pct/embeddings"
+  },
+  "performance": {
+    "prewarm_extraction_cache": true,
+    "extraction_workers": 8,
+    "query_cache_path": ".benchmark_cache/hotpotqa/dev_5pct/query_ner.json"
+  },
+  "results_dir": "benchmarks/hotpotqa/results",
+  "baseline_path": "benchmarks/hotpotqa/baselines/terag_ppr_openai_dev_5pct.json",
+  "regression_thresholds": {
+    "hit_rate_at_10_abs_drop": 0.03,
+    "mrr_abs_drop": 0.03,
+    "avg_query_time_multiplier": 1.3,
+    "build_time_multiplier": 1.3
+  }
+}

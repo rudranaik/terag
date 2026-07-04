@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class ExtractionCache:
             cache_dir: Directory to store cache files
         """
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(exist_ok=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # Cache file paths
         self.extractions_file = self.cache_dir / "extractions.json"
@@ -72,6 +73,7 @@ class ExtractionCache:
         self.api_usage_file = self.cache_dir / "api_usage.json"
         
         # In-memory cache
+        self._lock = threading.RLock()
         self.extractions: Dict[str, ExtractionResult] = {}
         self.document_metadata: Dict[str, Dict] = {}  # document_id -> metadata
         self.progress: Optional[ProcessingProgress] = None
@@ -162,12 +164,14 @@ class ExtractionCache:
     def is_passage_cached(self, content: str) -> bool:
         """Check if passage is already processed"""
         passage_hash = self.get_passage_hash(content)
-        return passage_hash in self.extractions
+        with self._lock:
+            return passage_hash in self.extractions
     
     def get_cached_extraction(self, content: str) -> Optional[ExtractionResult]:
         """Get cached extraction result for passage"""
         passage_hash = self.get_passage_hash(content)
-        return self.extractions.get(passage_hash)
+        with self._lock:
+            return self.extractions.get(passage_hash)
     
     def cache_extraction(
         self,
@@ -193,52 +197,53 @@ class ExtractionCache:
             processing_time_seconds: Time taken for extraction
             api_cost_estimate: Estimated API cost
         """
-        passage_hash = self.get_passage_hash(content)
-        
-        # Create extraction result
-        result = ExtractionResult(
-            passage_hash=passage_hash,
-            content=content,
-            entities=entities,
-            concepts=concepts,
-            document_metadata=document_metadata,
-            passage_metadata=passage_metadata,
-            timestamp=datetime.now().isoformat(),
-            model_used=model_used,
-            processing_time_seconds=processing_time_seconds,
-            api_cost_estimate=api_cost_estimate
-        )
-        
-        # Store in memory
-        self.extractions[passage_hash] = result
-        
-        # Store document metadata separately (for easy lookup)
-        doc_id = document_metadata.get('document_id') or document_metadata.get('source', 'unknown')
-        if doc_id not in self.document_metadata:
-            self.document_metadata[doc_id] = document_metadata
-        
-        # Log API usage
-        self.api_usage_log.append({
-            "timestamp": result.timestamp,
-            "passage_hash": passage_hash,
-            "model": model_used,
-            "processing_time": processing_time_seconds,
-            "cost_estimate": api_cost_estimate,
-            "tokens_estimate": len(content.split()) * 1.3  # Rough token estimate
-        })
-        
-        # Update progress
-        if self.progress:
-            self.progress.processed_passages += 1
-            self.progress.total_api_calls += 1
-            self.progress.total_cost_estimate += api_cost_estimate
-            self.progress.last_update = datetime.now().isoformat()
-        
-        # Save to disk immediately
-        self._save_extractions()
-        self._save_document_metadata()
-        self._save_progress()
-        self._save_api_usage()
+        with self._lock:
+            passage_hash = self.get_passage_hash(content)
+            
+            # Create extraction result
+            result = ExtractionResult(
+                passage_hash=passage_hash,
+                content=content,
+                entities=entities,
+                concepts=concepts,
+                document_metadata=document_metadata,
+                passage_metadata=passage_metadata,
+                timestamp=datetime.now().isoformat(),
+                model_used=model_used,
+                processing_time_seconds=processing_time_seconds,
+                api_cost_estimate=api_cost_estimate
+            )
+            
+            # Store in memory
+            self.extractions[passage_hash] = result
+            
+            # Store document metadata separately (for easy lookup)
+            doc_id = document_metadata.get('document_id') or document_metadata.get('source', 'unknown')
+            if doc_id not in self.document_metadata:
+                self.document_metadata[doc_id] = document_metadata
+            
+            # Log API usage
+            self.api_usage_log.append({
+                "timestamp": result.timestamp,
+                "passage_hash": passage_hash,
+                "model": model_used,
+                "processing_time": processing_time_seconds,
+                "cost_estimate": api_cost_estimate,
+                "tokens_estimate": len(content.split()) * 1.3  # Rough token estimate
+            })
+            
+            # Update progress
+            if self.progress:
+                self.progress.processed_passages += 1
+                self.progress.total_api_calls += 1
+                self.progress.total_cost_estimate += api_cost_estimate
+                self.progress.last_update = datetime.now().isoformat()
+            
+            # Save to disk immediately
+            self._save_extractions()
+            self._save_document_metadata()
+            self._save_progress()
+            self._save_api_usage()
         
         logger.info(f"Cached extraction for passage {passage_hash[:8]}... ({len(entities)} entities, {len(concepts)} concepts)")
     

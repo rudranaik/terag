@@ -1,0 +1,53 @@
+{
+  "dataset": "hotpotqa",
+  "split": "validation",
+  "sample_name": "smoke",
+  "seed": 42,
+  "strategy": "stratified_by_type_level_keep_gold_supports_add_random_distractors",
+  "target_qa_count": 5,
+  "target_passage_count": 20,
+  "source": {
+    "chunks_path": "hotpotqa_data/chunks.json",
+    "eval_path": "hotpotqa_data/eval_qa.json",
+    "chunks_sha256": "87088997ad58e802a1497010e40cada916d37cb6c83d021627a48dd126318553",
+    "eval_sha256": "fa0d8d3497c885ab267c9cfead3c87166aecac5e6f9e5b31c4b3c7e3977ab7e7",
+    "full_passage_count": 66581,
+    "full_qa_count": 7405
+  },
+  "actual": {
+    "passage_count": 20,
+    "qa_count": 5,
+    "supporting_passage_count": 10,
+    "distractor_count": 10
+  },
+  "qa_ids": [
+    "5ac2758b55429963665199c3",
+    "5a86458b5542991e771815ec",
+    "5ac2659b55429963665199a1",
+    "5a8482e55542997175ce1edc",
+    "5a7a9b9a5542990198eaf160"
+  ],
+  "old_passage_ids": [
+    2441,
+    2443,
+    3280,
+    4167,
+    11114,
+    11116,
+    11399,
+    13438,
+    14596,
+    18293,
+    23732,
+    23738,
+    26913,
+    26918,
+    29264,
+    32106,
+    36056,
+    55310,
+    59510,
+    59511
+  ],
+  "manifest_sha256": "d5723bcabc128eaa3399145536d405e976a59261f3966913b37493ae916e5810"
+}
