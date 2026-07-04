@@ -8,6 +8,7 @@ Constructs a directed, unweighted graph from document chunks:
 """
 
 import json
+import logging
 from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass, field
 from collections import defaultdict, Counter
@@ -21,6 +22,8 @@ except ImportError:
 
 # Import our edge weight calculator
 from terag.utils.edge_weights import EdgeWeightCalculator
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -467,7 +470,8 @@ class GraphBuilder:
     def build_graph_from_chunks(
         self,
         chunks: List[Dict],
-        extract_concepts_fn: callable
+        extract_concepts_fn: callable,
+        verbose: bool = False
     ) -> TERAGGraph:
         """
         Build TERAG graph from chunks
@@ -476,13 +480,15 @@ class GraphBuilder:
             chunks: List of chunk dictionaries with 'content' and metadata
             extract_concepts_fn: Function to extract concepts from text
                                 Returns (named_entities, document_concepts)
+            verbose: Log graph build progress when application logging is configured
 
         Returns:
             TERAGGraph: Constructed graph
         """
         graph = TERAGGraph()
 
-        print(f"Building graph from {len(chunks)} chunks...")
+        if verbose:
+            logger.info("Building graph from %s chunks...", len(chunks))
 
         # Phase 1: Create passage nodes and extract concepts
         all_concepts = []
@@ -528,11 +534,12 @@ class GraphBuilder:
 
             graph.add_passage(passage)
 
-            if (i + 1) % 100 == 0:
-                print(f"  Processed {i + 1}/{len(chunks)} chunks...")
+            if verbose and (i + 1) % 100 == 0:
+                logger.info("Processed %s/%s chunks", i + 1, len(chunks))
 
         # Phase 2: Merge and filter concepts
-        print("Merging and filtering concepts...")
+        if verbose:
+            logger.info("Merging and filtering concepts")
         concept_counter = Counter(c.concept_id for c in all_concepts)
 
         total_passages = len(chunks)
@@ -548,7 +555,8 @@ class GraphBuilder:
             graph.add_concept(concept)
 
         # Phase 3: Build edges
-        print("Building edges...")
+        if verbose:
+            logger.info("Building edges")
         for passage_id, passage in graph.passages.items():
             for concept_id in passage.concepts:
                 if concept_id in graph.concepts:
@@ -556,17 +564,22 @@ class GraphBuilder:
 
         # Phase 4: Optional concept clustering
         if self.enable_concept_clustering:
-            print("Clustering similar concepts...")
+            if verbose:
+                logger.info("Clustering similar concepts")
             graph = self._cluster_concepts(graph)
 
         # Print statistics
         stats = graph.get_statistics()
-        print(f"\nGraph construction complete!")
-        print(f"  Passages: {stats['num_passages']}")
-        print(f"  Concepts: {stats['num_concepts']}")
-        print(f"  Edges: {stats['num_edges']}")
-        print(f"  Avg concepts/passage: {stats['avg_concepts_per_passage']:.2f}")
-        print(f"  Avg passages/concept: {stats['avg_passages_per_concept']:.2f}")
+        if verbose:
+            logger.info(
+                "Graph construction complete: passages=%s concepts=%s edges=%s "
+                "avg_concepts_per_passage=%.2f avg_passages_per_concept=%.2f",
+                stats['num_passages'],
+                stats['num_concepts'],
+                stats['num_edges'],
+                stats['avg_concepts_per_passage'],
+                stats['avg_passages_per_concept'],
+            )
 
         return graph
 
@@ -587,24 +600,28 @@ class GraphBuilder:
 
     def build_graph_from_ner_extractions(
         self,
-        ner_extractions_file: str
+        ner_extractions_file: str,
+        verbose: bool = False
     ) -> TERAGGraph:
         """
         Build TERAG graph from NER extractions JSON file with hybrid edge weights
         
         Args:
             ner_extractions_file: Path to ner_extractions.json file
+            verbose: Log graph build progress when application logging is configured
             
         Returns:
             TERAGGraph: Constructed weighted graph
         """
-        print(f"Building graph from NER extractions: {ner_extractions_file}")
+        if verbose:
+            logger.info("Building graph from NER extractions: %s", ner_extractions_file)
         
         # Load extractions
         with open(ner_extractions_file, 'r', encoding='utf-8') as f:
             extractions = json.load(f)
         
-        print(f"Loaded {len(extractions)} extraction records")
+        if verbose:
+            logger.info("Loaded %s extraction records", len(extractions))
         
         graph = TERAGGraph()
         all_passage_texts = []  # For IDF calculation
@@ -619,7 +636,8 @@ class GraphBuilder:
             all_passage_texts.append(content)
             passage_data.append(extraction)
         
-        print(f"Processing {len(passage_data)} valid passages...")
+        if verbose:
+            logger.info("Processing %s valid passages", len(passage_data))
         
         # Phase 2: Create passage and concept nodes
         all_concepts = []
@@ -688,11 +706,12 @@ class GraphBuilder:
             
             graph.add_passage(passage)
             
-            if (i + 1) % 50 == 0:
-                print(f"  Processed {i + 1}/{len(passage_data)} passages...")
+            if verbose and (i + 1) % 50 == 0:
+                logger.info("Processed %s/%s passages", i + 1, len(passage_data))
         
         # Phase 3: Merge and filter concepts by frequency
-        print("Merging and filtering concepts...")
+        if verbose:
+            logger.info("Merging and filtering concepts")
         concept_counter = Counter(c.concept_id for c in all_concepts)
         
         total_passages = len(passage_data)
@@ -709,11 +728,13 @@ class GraphBuilder:
             
             graph.add_concept(concept)
         
-        print(f"  Filtered {filtered_concepts} concepts by frequency")
-        print(f"  Kept {len(graph.concepts)} concepts")
+        if verbose:
+            logger.info("Filtered %s concepts by frequency", filtered_concepts)
+            logger.info("Kept %s concepts", len(graph.concepts))
         
         # Phase 4: Build weighted edges
-        print("Building weighted edges...")
+        if verbose:
+            logger.info("Building weighted edges")
         total_edges = 0
         
         for passage_id, passage in graph.passages.items():
@@ -729,23 +750,30 @@ class GraphBuilder:
                     graph.add_edge(passage_id, concept_id, weight)
                     total_edges += 1
         
-        print(f"  Created {total_edges} weighted edges")
+        if verbose:
+            logger.info("Created %s weighted edges", total_edges)
         
         # Phase 5: Optional concept clustering
         if self.enable_concept_clustering:
-            print("Clustering similar concepts...")
+            if verbose:
+                logger.info("Clustering similar concepts")
             graph = self._cluster_concepts(graph)
         
         # Print final statistics
         stats = graph.get_statistics()
-        print(f"\nGraph construction complete!")
-        print(f"  Passages: {stats['num_passages']}")
-        print(f"  Concepts: {stats['num_concepts']}")
-        print(f"    - Entities: {sum(1 for c in graph.concepts.values() if c.concept_type == 'named_entity')}")
-        print(f"    - Concepts: {sum(1 for c in graph.concepts.values() if c.concept_type == 'document_concept')}")
-        print(f"  Edges: {stats['num_edges']}")
-        print(f"  Avg concepts/passage: {stats['avg_concepts_per_passage']:.2f}")
-        print(f"  Avg passages/concept: {stats['avg_passages_per_concept']:.2f}")
+        if verbose:
+            logger.info(
+                "Graph construction complete: passages=%s concepts=%s entities=%s "
+                "document_concepts=%s edges=%s avg_concepts_per_passage=%.2f "
+                "avg_passages_per_concept=%.2f",
+                stats['num_passages'],
+                stats['num_concepts'],
+                sum(1 for c in graph.concepts.values() if c.concept_type == 'named_entity'),
+                sum(1 for c in graph.concepts.values() if c.concept_type == 'document_concept'),
+                stats['num_edges'],
+                stats['avg_concepts_per_passage'],
+                stats['avg_passages_per_concept'],
+            )
         
         if self.enable_edge_weights:
             # Calculate weight statistics
@@ -754,7 +782,13 @@ class GraphBuilder:
                 all_weights.extend(passage_concepts.values())
             
             if all_weights:
-                print(f"  Edge weights - Min: {min(all_weights):.3f}, Max: {max(all_weights):.3f}, Avg: {sum(all_weights)/len(all_weights):.3f}")
+                if verbose:
+                    logger.info(
+                        "Edge weights: min=%.3f max=%.3f avg=%.3f",
+                        min(all_weights),
+                        max(all_weights),
+                        sum(all_weights) / len(all_weights),
+                    )
         
         return graph
     
@@ -818,7 +852,7 @@ def build_graph_from_chunks_file(
 
     # Save if requested
     if output_file:
-        print(f"\nSaving graph to {output_file}...")
+        logger.info("Saving graph to %s", output_file)
         graph.save_to_file(output_file)
 
     return graph

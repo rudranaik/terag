@@ -110,9 +110,16 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
     - Public API exports `RetrievalResult` and `RetrievalMetrics`.
     - Result shape tests pass via `.venv/bin/python -m pytest tests`.
 
-- [ ] **Remove print-based library behavior.**
+- [x] **Remove print-based library behavior.**
   - Replace `print()` with Python logging and progress callbacks.
   - Default library calls should be quiet unless logging is configured.
+  - Converted public TERAG construction/query/save flows, graph building, PPR retrieval, NER extraction progress, and entity deduplication progress from direct `print()` calls to Python logging.
+  - Kept `verbose` arguments for compatibility; they now emit log records when application logging is configured instead of writing directly to stdout.
+  - Added a regression test asserting `TERAG.from_chunks(..., verbose=False)` plus `query()` produces no stdout/stderr.
+  - Remaining `print()` calls are limited to demo/script entry points or standalone CLI-style modules and should be cleaned up during repository cleanup/CLI work.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes.
+    - `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json` passes against the accepted smoke baseline.
   - Acceptance: quickstart output is controlled by the caller, not the library.
 
 - [ ] **Clean repository and distribution contents.**
@@ -169,6 +176,13 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Keep README short: install, 5-minute quickstart, feature matrix, links.
   - Add docs pages for concepts, configuration, persistence, integrations, provider setup, index lifecycle, evaluation, and troubleshooting.
   - Generate API reference from docstrings.
+  - Progress: README has been rewritten into a short install/quickstart/modes/benchmarks page.
+  - Progress: moved deeper algorithm and configuration explanation into `docs/technical-overview.md`.
+  - Progress: added `docs/retrieval-flow.md` with Mermaid diagrams explaining how PPR, semantic, and hybrid retrieval work after graph construction.
+  - Still pending: configuration, persistence, integrations, provider setup, index lifecycle, evaluation, troubleshooting, and generated API reference docs.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes.
+    - `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json` passes against the accepted smoke baseline.
   - Acceptance: docs have one canonical path for common tasks and no conflicting examples.
 
 - [ ] **Add notebooks and realistic examples.**
@@ -278,10 +292,14 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
 - [ ] **Add visual graph inspection helpers.**
   - Export graph summaries, concept neighborhoods, and retrieval traces.
   - Keep visualization dependencies optional.
+  - Progress: added a documentation-only retrieval visualization in `docs/retrieval-flow.md`.
+  - Still pending: actual package APIs for graph summaries, neighborhoods, trace data, and optional rendered visualizations.
 
 - [ ] **Add retrieval explainability.**
   - Show matched query entities, matched concepts, graph paths/neighborhoods, PPR contribution, semantic contribution, and reranker contribution.
   - Useful for enterprise debugging and evaluation.
+  - Progress: documented the target trace shape in `docs/retrieval-flow.md`.
+  - Still pending: structured trace objects returned by the package.
 
 - [ ] **Add multimodal/document-structure roadmap.**
   - Consider table-aware and PDF-aware parsing after text/Markdown/PDF ingestion is stable.

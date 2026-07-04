@@ -170,7 +170,7 @@ class TERAG:
             config: TERAG configuration
             embedding_model: Optional embedding model (e.g., SentenceTransformer)
                            If None and OPENAI_API_KEY is available, will auto-create EmbeddingManager
-            verbose: Print progress
+            verbose: Log progress when application logging is configured
 
         Returns:
             TERAG system ready for retrieval
@@ -179,13 +179,15 @@ class TERAG:
             config = TERAGConfig()
 
         if verbose:
-            print("Building TERAG system from chunks...")
-            print(f"  Chunks: {len(chunks)}")
-            print(f"  LLM-based NER: {'ENABLED' if config.use_llm_for_ner else 'DISABLED (using regex fallback)'}")
+            logger.info("Building TERAG system from %s chunks", len(chunks))
+            logger.info(
+                "LLM-based NER: %s",
+                "enabled" if config.use_llm_for_ner else "disabled (using regex fallback)",
+            )
             if config.use_llm_for_ner:
-                print(f"  Provider: {config.llm_provider}")
+                logger.info("LLM provider: %s", config.llm_provider)
                 if config.llm_model:
-                    print(f"  Model: {config.llm_model}")
+                    logger.info("LLM model: %s", config.llm_model)
                 
                 # Check for appropriate API key
                 import os
@@ -193,9 +195,12 @@ class TERAG:
                 has_key = config.llm_api_key or os.getenv(key_name)
                 
                 if has_key:
-                    print(f"  API Key: Found ({'config override' if config.llm_api_key else key_name})")
+                    logger.info(
+                        "API key found via %s",
+                        "config override" if config.llm_api_key else key_name,
+                    )
                 else:
-                    print(f"  API Key: Not found (will use regex fallback)")
+                    logger.info("API key not found; regex fallback will be used")
 
         # Auto-create EmbeddingManager if not provided and OPENAI_API_KEY is available
         if embedding_model is None and config.use_semantic_entity_matching:
@@ -206,22 +211,26 @@ class TERAG:
                     from terag.embeddings.manager import EmbeddingManager
                     embedding_model = EmbeddingManager(api_key=openai_key)
                     if verbose:
-                        print(f"  Semantic Matching: ENABLED (auto-created EmbeddingManager)")
-                        print(f"    Model: text-embedding-3-small")
-                        print(f"    Threshold: {config.semantic_match_threshold}")
+                        logger.info(
+                            "Semantic matching enabled with auto-created EmbeddingManager "
+                            "(model=text-embedding-3-small threshold=%s)",
+                            config.semantic_match_threshold,
+                        )
                 except ImportError:
                     if verbose:
-                        print(f"  Semantic Matching: DISABLED (EmbeddingManager not available)")
+                        logger.info("Semantic matching disabled; EmbeddingManager is not available")
             else:
                 if verbose:
-                    print(f"  Semantic Matching: DISABLED (no OPENAI_API_KEY found)")
+                    logger.info("Semantic matching disabled; OPENAI_API_KEY was not found")
         elif embedding_model is not None:
             if verbose:
-                print(f"  Semantic Matching: ENABLED (using provided embedding model)")
-                print(f"    Threshold: {config.semantic_match_threshold}")
+                logger.info(
+                    "Semantic matching enabled with provided embedding model (threshold=%s)",
+                    config.semantic_match_threshold,
+                )
         else:
             if verbose:
-                print(f"  Semantic Matching: DISABLED (use_semantic_entity_matching=False)")
+                logger.info("Semantic matching disabled by config")
 
         start_time = time.time()
 
@@ -243,17 +252,21 @@ class TERAG:
 
         graph = builder.build_graph_from_chunks(
             chunks=chunks,
-            extract_concepts_fn=graph_ner_extractor.extract_entities_and_concepts
+            extract_concepts_fn=graph_ner_extractor.extract_entities_and_concepts,
+            verbose=verbose
         )
 
         build_time = time.time() - start_time
 
         if verbose:
-            print(f"\nGraph built in {build_time:.2f}s")
             stats = graph.get_statistics()
-            print(f"  Passages: {stats['num_passages']}")
-            print(f"  Concepts: {stats['num_concepts']}")
-            print(f"  Edges: {stats['num_edges']}")
+            logger.info(
+                "Graph built in %.2fs: passages=%s concepts=%s edges=%s",
+                build_time,
+                stats['num_passages'],
+                stats['num_concepts'],
+                stats['num_edges'],
+            )
 
         # Create TERAG system
         terag = cls(graph=graph, config=config, embedding_model=embedding_model)
@@ -263,8 +276,7 @@ class TERAG:
             save_path = config.graph_save_path
             terag.save_graph(save_path)
             if verbose:
-                print(f"\n✓ Graph auto-saved to: {save_path}")
-                print(f"  To load: TERAG.from_graph_file('{save_path}')")
+                logger.info("Graph auto-saved to %s", save_path)
 
         return terag
 
@@ -283,13 +295,13 @@ class TERAG:
             chunks_file: Path to chunks JSON file
             config: TERAG configuration
             embedding_model: Optional embedding model
-            verbose: Print progress
+            verbose: Log progress when application logging is configured
 
         Returns:
             TERAG system
         """
         if verbose:
-            print(f"Loading chunks from {chunks_file}...")
+            logger.info("Loading chunks from %s", chunks_file)
 
         with open(chunks_file, 'r', encoding='utf-8') as f:
             chunks = json.load(f)
@@ -312,13 +324,13 @@ class TERAG:
             config: TERAG configuration
             embedding_model: Optional embedding model
                            If None and OPENAI_API_KEY is available, will auto-create EmbeddingManager
-            verbose: Print progress
+            verbose: Log progress when application logging is configured
 
         Returns:
             TERAG system
         """
         if verbose:
-            print(f"Loading graph from {graph_file}...")
+            logger.info("Loading graph from %s", graph_file)
 
         # Load graph and embeddings
         graph_data = TERAGGraph.load_from_file(graph_file)
@@ -335,11 +347,14 @@ class TERAG:
 
         if verbose:
             stats = graph.get_statistics()
-            print(f"  Passages: {stats['num_passages']}")
-            print(f"  Concepts: {stats['num_concepts']}")
-            print(f"  Edges: {stats['num_edges']}")
+            logger.info(
+                "Loaded graph: passages=%s concepts=%s edges=%s",
+                stats['num_passages'],
+                stats['num_concepts'],
+                stats['num_edges'],
+            )
             if saved_embeddings:
-                print(f"  Loaded {len(saved_embeddings)} concept embeddings from graph file")
+                logger.info("Loaded %s concept embeddings from graph file", len(saved_embeddings))
 
         # Auto-create EmbeddingManager if not provided and OPENAI_API_KEY is available
         if embedding_model is None and config.use_semantic_entity_matching:
@@ -350,22 +365,26 @@ class TERAG:
                     from terag.embeddings.manager import EmbeddingManager
                     embedding_model = EmbeddingManager(api_key=openai_key)
                     if verbose:
-                        print(f"  Semantic Matching: ENABLED (auto-created EmbeddingManager)")
-                        print(f"    Model: text-embedding-3-small")
-                        print(f"    Threshold: {config.semantic_match_threshold}")
+                        logger.info(
+                            "Semantic matching enabled with auto-created EmbeddingManager "
+                            "(model=text-embedding-3-small threshold=%s)",
+                            config.semantic_match_threshold,
+                        )
                 except ImportError:
                     if verbose:
-                        print(f"  Semantic Matching: DISABLED (EmbeddingManager not available)")
+                        logger.info("Semantic matching disabled; EmbeddingManager is not available")
             else:
                 if verbose:
-                    print(f"  Semantic Matching: DISABLED (no OPENAI_API_KEY found)")
+                    logger.info("Semantic matching disabled; OPENAI_API_KEY was not found")
         elif embedding_model is not None:
             if verbose:
-                print(f"  Semantic Matching: ENABLED (using provided embedding model)")
-                print(f"    Threshold: {config.semantic_match_threshold}")
+                logger.info(
+                    "Semantic matching enabled with provided embedding model (threshold=%s)",
+                    config.semantic_match_threshold,
+                )
         else:
             if verbose:
-                print(f"  Semantic Matching: DISABLED (use_semantic_entity_matching=False)")
+                logger.info("Semantic matching disabled by config")
 
         # Create TERAG instance
         terag = cls(graph=graph, config=config, embedding_model=embedding_model)
@@ -374,7 +393,7 @@ class TERAG:
         if saved_embeddings and hasattr(terag, 'retriever'):
             terag.retriever.concept_embeddings = saved_embeddings
             if verbose:
-                print(f"  ✓ Restored {len(saved_embeddings)} concept embeddings to retriever")
+                logger.info("Restored %s concept embeddings to retriever", len(saved_embeddings))
         
         return terag
 
@@ -398,7 +417,7 @@ class TERAG:
             ppr_weight: Weight for PPR scores in hybrid retrieval (default: 0.6)
             semantic_weight: Weight for semantic scores in hybrid retrieval (default: 0.4)
             min_score_threshold: Minimum score threshold (method-specific)
-            verbose: Print progress
+            verbose: Log progress when application logging is configured
 
         Returns:
             (results, metrics) tuple
@@ -428,7 +447,7 @@ class TERAG:
         self._validate_retrieval_method(method)
         
         if verbose:
-            print(f"Using {method.upper()} retrieval method")
+            logger.info("Using %s retrieval method", method.upper())
         
         # Route to appropriate retrieval method
         if method == "ppr":
@@ -623,7 +642,10 @@ class TERAG:
             self._semantic_retriever.load_passage_embeddings(self.graph)
             
             if verbose:
-                print(f"Initialized semantic retriever with {len(self.graph.passages)} passages")
+                logger.info(
+                    "Initialized semantic retriever with %s passages",
+                    len(self.graph.passages),
+                )
         
         # Process query
         from terag.retrieval.query_processor import QueryProcessor
@@ -695,7 +717,11 @@ class TERAG:
             )
             
             if verbose:
-                print(f"Initialized hybrid retriever (PPR: {ppr_weight}, Semantic: {semantic_weight})")
+                logger.info(
+                    "Initialized hybrid retriever (PPR: %s, Semantic: %s)",
+                    ppr_weight,
+                    semantic_weight,
+                )
         
         # Retrieve
         start_time = time.time()
@@ -730,11 +756,13 @@ class TERAG:
         )
         
         if verbose and analysis:
-            print(f"\nHybrid Retrieval Analysis:")
-            print(f"  Total results: {analysis.total_results}")
-            print(f"  PPR-only: {analysis.ppr_only_results}")
-            print(f"  Semantic-only: {analysis.semantic_only_results}")
-            print(f"  Combined: {analysis.combined_results}")
+            logger.info(
+                "Hybrid retrieval analysis: total=%s ppr_only=%s semantic_only=%s combined=%s",
+                analysis.total_results,
+                analysis.ppr_only_results,
+                analysis.semantic_only_results,
+                analysis.combined_results,
+            )
         
         return results, metrics
 
@@ -747,11 +775,14 @@ class TERAG:
         if hasattr(self, 'retriever') and hasattr(self.retriever, 'concept_embeddings'):
             if self.retriever.concept_embeddings:
                 concept_embeddings = self.retriever.concept_embeddings
-                print(f"  Saving {len(concept_embeddings)} concept embeddings with graph")
+                logger.info(
+                    "Saving %s concept embeddings with graph",
+                    len(concept_embeddings),
+                )
         
         self.graph.save_to_file(filepath, concept_embeddings=concept_embeddings)
         abs_path = os.path.abspath(filepath)
-        print(f"✓ Graph saved to: {abs_path}")
+        logger.info("Graph saved to %s", abs_path)
 
     def get_graph_statistics(self) -> Dict:
         """Get graph statistics"""
@@ -780,10 +811,10 @@ def create_terag_from_existing_chunks(
     embedding_model = None
     try:
         from sentence_transformers import SentenceTransformer
-        print(f"Loading embedding model: {embedding_model_name}")
+        logger.info("Loading embedding model: %s", embedding_model_name)
         embedding_model = SentenceTransformer(embedding_model_name)
     except ImportError:
-        print("Warning: sentence-transformers not available, semantic weighting disabled")
+        logger.warning("sentence-transformers not available; semantic weighting disabled")
 
     # Build TERAG
     terag = TERAG.from_chunks_file(

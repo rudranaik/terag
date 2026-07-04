@@ -112,6 +112,28 @@ def test_query_can_return_metrics_for_compatibility():
     assert len(results) == 1
     assert metrics.num_results == 1
 
+def test_build_and_query_are_quiet_by_default(capsys):
+    chunks = [
+        {"content": "Apple revenue increased in Q4 2024.", "metadata": {"source": "news"}},
+        {"content": "Microsoft expanded Azure cloud services.", "metadata": {"source": "news"}},
+    ]
+
+    terag = TERAG.from_chunks(
+        chunks,
+        config=TERAGConfig(
+            top_k=1,
+            min_concept_freq=1,
+            max_concept_freq_ratio=1.0,
+            use_semantic_entity_matching=False
+        ),
+        verbose=False
+    )
+    terag.query("Apple revenue")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
 def test_empty_insert_and_query_with_string_documents():
     terag = TERAG.empty(
         config=TERAGConfig(

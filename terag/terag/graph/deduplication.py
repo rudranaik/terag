@@ -45,7 +45,7 @@ class OpenAIEntityDeduplicator:
     def deduplicate_entities_from_graph(self, graph: TERAGGraph) -> Dict[str, str]:
         """Main deduplication pipeline using OpenAI embeddings"""
         
-        print(f"🔍 Starting OpenAI-based deduplication on {len(graph.concepts)} entities")
+        logger.info("Starting OpenAI-based deduplication on %s entities", len(graph.concepts))
         
         # Get all entities
         entities = [
@@ -53,46 +53,49 @@ class OpenAIEntityDeduplicator:
             if concept.concept_type in ["named_entity", "concept"]
         ]
         
-        print(f"📊 Processing {len(entities)} entities for deduplication")
+        logger.info("Processing %s entities for deduplication", len(entities))
         
         # Phase 1: String similarity
-        print("🔤 Phase 1: String similarity matching...")
+        logger.info("Phase 1: string similarity matching")
         string_candidates = self._phase1_string_similarity(entities)
-        print(f"   Found {len(string_candidates)} string similarity candidates")
+        logger.info("Found %s string similarity candidates", len(string_candidates))
         
         # Phase 2: OpenAI Embedding similarity
         if self.embedding_threshold < 0.99:  # Only if embeddings enabled
-            print("🧠 Phase 2: OpenAI embedding similarity...")
-            print(f"   Using OpenAI {self.embedding_manager.model} model")
-            print(f"   Batch size: {self.embedding_manager.batch_size} entities per API call")
+            logger.info("Phase 2: OpenAI embedding similarity")
+            logger.info("Using OpenAI %s model", self.embedding_manager.model)
+            logger.info(
+                "Batch size: %s entities per API call",
+                self.embedding_manager.batch_size,
+            )
             
             embedding_candidates = self._phase2_openai_embedding_similarity(entities, string_candidates)
-            print(f"   Found {len(embedding_candidates)} embedding similarity candidates")
+            logger.info("Found %s embedding similarity candidates", len(embedding_candidates))
         else:
-            print("⏭️  Phase 2: Skipping embeddings (threshold = 0.99)")
+            logger.info("Phase 2: skipping embeddings (threshold = 0.99)")
             embedding_candidates = string_candidates
         
         # Phase 3: Graph validation
-        print("🕸️  Phase 3: Graph-based validation...")
+        logger.info("Phase 3: graph-based validation")
         validated_candidates = self._phase3_graph_validation(embedding_candidates, graph)
-        print(f"   Validated {len(validated_candidates)} candidates using graph context")
+        logger.info("Validated %s candidates using graph context", len(validated_candidates))
         
         # Create clusters
         clusters = self._create_entity_clusters(validated_candidates)
         entity_mapping = self._create_entity_mapping(clusters)
         
-        print(f"✅ Deduplication complete: {len(entity_mapping)} entities will be merged")
+        logger.info("Deduplication complete: %s entities will be merged", len(entity_mapping))
         return entity_mapping, clusters
     
     def _phase1_string_similarity(self, entities: List[str]) -> List[DuplicateCandidate]:
         """Phase 1: Fast string similarity matching"""
         candidates = []
         
-        print(f"   🔄 Comparing {len(entities)} entities...")
+        logger.info("Comparing %s entities", len(entities))
         
         for i, entity1 in enumerate(entities):
             if (i + 1) % 500 == 0:
-                print(f"      Processed {i+1}/{len(entities)} entities...")
+                logger.info("Processed %s/%s entities", i + 1, len(entities))
                 
             for j, entity2 in enumerate(entities[i+1:], i+1):
                 if entity1 == entity2:
@@ -119,14 +122,14 @@ class OpenAIEntityDeduplicator:
         """Phase 2: OpenAI embedding similarity"""
         
         # Get OpenAI embeddings for all entities
-        print(f"   📡 Getting OpenAI embeddings for {len(entities)} entities...")
+        logger.info("Getting OpenAI embeddings for %s entities", len(entities))
         
         start_time = time.time()
         entity_embeddings = self.embedding_manager.embed_texts_batch(entities, show_progress=True)
         embedding_time = time.time() - start_time
         
-        print(f"   ✅ OpenAI embeddings completed in {embedding_time:.2f}s")
-        print(f"   💰 Estimated cost: ${len(entities) * 0.00002:.4f} (approx)")
+        logger.info("OpenAI embeddings completed in %.2fs", embedding_time)
+        logger.info("Estimated cost: $%.4f (approx)", len(entities) * 0.00002)
         
         # Add embedding scores to string candidates
         enhanced_candidates = []
@@ -140,7 +143,7 @@ class OpenAIEntityDeduplicator:
                 enhanced_candidates.append(candidate)
         
         # Find new embedding-based candidates (not found by string matching)
-        print(f"   🔄 Finding additional semantic similarities...")
+        logger.info("Finding additional semantic similarities")
         
         # For efficiency, sample entities rather than all pairs
         import random
@@ -173,7 +176,7 @@ class OpenAIEntityDeduplicator:
                         )
                         new_candidates.append(candidate)
         
-        print(f"   Found {len(new_candidates)} additional semantic candidates")
+        logger.info("Found %s additional semantic candidates", len(new_candidates))
         return enhanced_candidates + new_candidates
     
     def _phase3_graph_validation(self, candidates: List[DuplicateCandidate], graph: TERAGGraph) -> List[DuplicateCandidate]:

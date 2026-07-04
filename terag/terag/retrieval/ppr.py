@@ -9,12 +9,15 @@ Implements Personalized PageRank (PPR) algorithm for passage retrieval:
 """
 
 import numpy as np
+import logging
 from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass, field
 from collections import defaultdict
 import time
 
 from terag.graph.builder import TERAGGraph
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -161,7 +164,7 @@ class PersonalizedPageRank:
 
         Args:
             restart_vector: Dict mapping node_id -> restart probability
-            verbose: Print progress
+            verbose: Log progress when application logging is configured
 
         Returns:
             Dict mapping node_id -> PPR score
@@ -198,11 +201,11 @@ class PersonalizedPageRank:
             pi = pi_new
 
             if verbose and (iteration + 1) % 10 == 0:
-                print(f"  PPR iteration {iteration + 1}: diff={diff:.6f}")
+                logger.info("PPR iteration %s: diff=%.6f", iteration + 1, diff)
 
             if diff < self.tolerance:
                 if verbose:
-                    print(f"  PPR converged in {iteration + 1} iterations")
+                    logger.info("PPR converged in %s iterations", iteration + 1)
                 break
 
         # Convert back to dictionary
@@ -251,11 +254,14 @@ class TERAGRetriever:
 
     def _precompute_concept_embeddings(self):
         """Pre-compute embeddings for all concepts"""
-        print("Pre-computing concept embeddings...")
+        logger.info("Pre-computing concept embeddings")
         concept_texts = [c.concept_text for c in self.graph.concepts.values()]
 
         if hasattr(self.embedding_model, 'encode'):
-            embeddings = self.embedding_model.encode(concept_texts, show_progress_bar=True)
+            try:
+                embeddings = self.embedding_model.encode(concept_texts, show_progress_bar=False)
+            except TypeError:
+                embeddings = self.embedding_model.encode(concept_texts)
 
             for concept_id, embedding in zip(self.graph.concepts.keys(), embeddings):
                 self.concept_embeddings[concept_id] = embedding
@@ -278,7 +284,7 @@ class TERAGRetriever:
             top_k: Number of passages to return
             semantic_weight: Weight for semantic similarity
             frequency_weight: Weight for frequency-based score
-            verbose: Print progress
+            verbose: Log progress when application logging is configured
 
         Returns:
             (results, metrics)
@@ -286,14 +292,14 @@ class TERAGRetriever:
         start_time = time.time()
 
         if verbose:
-            print(f"\nTERAG Retrieval for: '{query}'")
-            print(f"Query entities: {query_entities}")
+            logger.info("TERAG retrieval for query: %r", query)
+            logger.info("Query entities: %s", query_entities)
 
         # Step 1: Match query entities to graph concepts
         matched_concepts = self._match_entities_to_concepts(query_entities)
 
         if verbose:
-            print(f"Matched concepts: {len(matched_concepts)}")
+            logger.info("Matched concepts: %s", len(matched_concepts))
 
         if not matched_concepts:
             # No matches - return empty
@@ -314,7 +320,7 @@ class TERAGRetriever:
         )
 
         if verbose:
-            print(f"Restart vector size: {len(restart_vector)}")
+            logger.info("Restart vector size: %s", len(restart_vector))
 
         # Step 3: Run Personalized PageRank
         ppr_scores = self.ppr.compute_ppr(restart_vector, verbose=verbose)
@@ -362,7 +368,11 @@ class TERAGRetriever:
         )
 
         if verbose:
-            print(f"\nRetrieved {len(results)} passages in {metrics.retrieval_time:.3f}s")
+            logger.info(
+                "Retrieved %s passages in %.3fs",
+                len(results),
+                metrics.retrieval_time,
+            )
 
         return results, metrics
 

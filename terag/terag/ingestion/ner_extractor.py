@@ -252,7 +252,7 @@ class NERExtractor:
         processed_count = 0
         
         if self.enable_progress_reporting:
-            print(f"\n🚀 Starting extraction for {len(passages)} passages...")
+            logger.info("Starting extraction for %s passages", len(passages))
             
         for i, passage in enumerate(passages):
             content = passage.get('content', '')
@@ -268,8 +268,12 @@ class NERExtractor:
                 
                 if self.enable_progress_reporting and (i + 1) % progress_interval == 0:
                     progress = self.cache.get_progress_report()
-                    print(f"📊 Progress: {progress['completion_percentage']} complete "
-                          f"({progress['completed_passages']}/{progress['total_passages']} passages)")
+                    logger.info(
+                        "Extraction progress: %s complete (%s/%s passages)",
+                        progress['completion_percentage'],
+                        progress['completed_passages'],
+                        progress['total_passages'],
+                    )
                 continue
             
             # Extract with LLM
@@ -283,9 +287,13 @@ class NERExtractor:
                 # Print progress
                 if self.enable_progress_reporting and (i + 1) % progress_interval == 0:
                     progress = self.cache.get_progress_report()
-                    print(f"📊 Progress: {progress['completion_percentage']} complete "
-                          f"({progress['completed_passages']}/{progress['total_passages']} passages, "
-                          f"~{progress['estimated_remaining_time']} remaining)")
+                    logger.info(
+                        "Extraction progress: %s complete (%s/%s passages, ~%s remaining)",
+                        progress['completion_percentage'],
+                        progress['completed_passages'],
+                        progress['total_passages'],
+                        progress['estimated_remaining_time'],
+                    )
                     
             except Exception as e:
                 logger.error(f"Failed to extract from passage {i}: {e}")
@@ -295,11 +303,13 @@ class NERExtractor:
         # Final report
         if self.enable_progress_reporting:
             final_progress = self.cache.get_progress_report()
-            print(f"\n✅ Extraction completed!")
-            print(f"📈 Final stats: {final_progress['completed_passages']} successful, "
-                  f"{final_progress['skipped_passages']} cached, "
-                  f"{final_progress['failed_passages']} failed")
-            print(f"💰 Total cost: {final_progress['total_cost_estimate']}")
+            logger.info(
+                "Extraction completed: %s successful, %s cached, %s failed, total cost %s",
+                final_progress['completed_passages'],
+                final_progress['skipped_passages'],
+                final_progress['failed_passages'],
+                final_progress['total_cost_estimate'],
+            )
             
         return results
     
@@ -463,7 +473,7 @@ class NERExtractor:
             return merged
 
         except Exception as e:
-            print(f"Warning: LLM enhancement failed: {e}")
+            logger.warning("LLM enhancement failed: %s", e)
             return entities
 
     def _create_ner_prompt(self, text: str) -> str:
