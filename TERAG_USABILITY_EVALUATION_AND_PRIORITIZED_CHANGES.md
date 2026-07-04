@@ -56,11 +56,16 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Add `__all__` and an API stability note.
   - Acceptance: README quickstart uses only public imports.
 
-- [ ] **Standardize the core user API around insert/query/retrieve.**
+- [x] **Standardize the core user API around insert/query/retrieve.**
   - Add `TERAG.insert()`, `TERAG.add_documents()`, `TERAG.add_chunks()`, and `TERAG.query()`.
   - Keep `retrieve()` for retriever-style use and backward compatibility.
   - Make the default return value a list of result objects, not `(results, metrics)`.
   - Expose metrics through `return_metrics=True`, `last_metrics`, or `get_metrics()`.
+  - Implemented `TERAG.empty()` for build-later workflows.
+  - Implemented `query()` returning results by default and `(results, metrics)` with `return_metrics=True`.
+  - Implemented `insert` / `add_documents()` for strings, dicts with `content` or `text`, and document-like objects with `page_content`.
+  - Implemented `add_chunks()` as a rebuild-backed compatibility shim. True incremental graph updates remain tracked in the P1 incremental-update item.
+  - Edge cases validated: metrics compatibility, string documents, dict text documents, document-like objects, add-chunks rebuild, unsupported `rebuild=False`, and invalid document shapes.
   - Acceptance: the simplest usage is comparable to:
     ```python
     from terag import TERAG

@@ -144,6 +144,17 @@ class TERAG:
         self._hybrid_retriever = None
 
     @classmethod
+    def empty(
+        cls,
+        config: Optional[TERAGConfig] = None,
+        embedding_model: Optional[object] = None
+    ) -> 'TERAG':
+        """Create an empty TERAG instance that can receive chunks later."""
+        if config is None:
+            config = TERAGConfig()
+        return cls(graph=TERAGGraph(), config=config, embedding_model=embedding_model)
+
+    @classmethod
     def from_chunks(
         cls,
         chunks: List[Dict],
@@ -430,6 +441,117 @@ class TERAG:
             )
         else:
             raise ValueError(f"Invalid retrieval method: {method}")
+
+    def query(
+        self,
+        query: str,
+        method: Optional[str] = None,
+        top_k: Optional[int] = None,
+        return_metrics: bool = False,
+        **kwargs
+    ):
+        """
+        Query TERAG and return retrieval results by default.
+
+        This is the simple user-facing API. Use ``retrieve()`` when you need
+        backward-compatible ``(results, metrics)`` tuple behavior.
+        """
+        results, metrics = self.retrieve(
+            query=query,
+            method=method,
+            top_k=top_k,
+            **kwargs
+        )
+        if return_metrics:
+            return results, metrics
+        return results
+
+    def add_chunks(
+        self,
+        chunks: List[Dict],
+        rebuild: bool = True,
+        verbose: bool = True
+    ) -> 'TERAG':
+        """
+        Add chunks to the index.
+
+        Current implementation rebuilds the in-memory graph from existing and
+        new chunks. This keeps behavior correct while preserving a future path
+        for true incremental graph updates.
+        """
+        if not rebuild:
+            raise NotImplementedError(
+                "Incremental graph updates are not implemented yet. "
+                "Call add_chunks(..., rebuild=True) to rebuild the graph."
+            )
+
+        existing_chunks = [
+            {"content": passage.content, "metadata": passage.metadata}
+            for passage in self.graph.passages.values()
+        ]
+        updated = self.from_chunks(
+            existing_chunks + chunks,
+            config=self.config,
+            embedding_model=self.embedding_model,
+            verbose=verbose
+        )
+        self.graph = updated.graph
+        self.retriever = updated.retriever
+        self.query_ner = updated.query_ner
+        self.ner_extractor = updated.ner_extractor
+        self._semantic_retriever = None
+        self._hybrid_retriever = None
+        return self
+
+    def add_documents(
+        self,
+        documents: List,
+        rebuild: bool = True,
+        verbose: bool = True
+    ) -> 'TERAG':
+        """
+        Add plain strings or document-like objects to the index.
+
+        Supported inputs:
+        - string documents
+        - dicts with ``content`` or ``text`` and optional ``metadata``
+        - objects with ``page_content`` and optional ``metadata`` attributes
+        """
+        chunks = [self._document_to_chunk(document, i) for i, document in enumerate(documents)]
+        return self.add_chunks(chunks, rebuild=rebuild, verbose=verbose)
+
+    insert = add_documents
+
+    @staticmethod
+    def _document_to_chunk(document, index: int) -> Dict:
+        """Convert common document shapes into TERAG chunk dictionaries."""
+        if isinstance(document, str):
+            return {"content": document, "metadata": {"document_index": index}}
+
+        if isinstance(document, dict):
+            if "content" in document:
+                return {
+                    "content": document["content"],
+                    "metadata": document.get("metadata", {})
+                }
+            if "text" in document:
+                return {
+                    "content": document["text"],
+                    "metadata": document.get("metadata", {})
+                }
+            raise ValueError("Document dict must include 'content' or 'text'.")
+
+        page_content = getattr(document, "page_content", None)
+        if page_content is not None:
+            return {
+                "content": page_content,
+                "metadata": getattr(document, "metadata", {}) or {}
+            }
+
+        raise TypeError(
+            "Documents must be strings, dicts with 'content' or 'text', "
+            "or objects with a 'page_content' attribute."
+        )
     
     def _validate_retrieval_method(self, method: str) -> None:
         """Validate retrieval method and check prerequisites"""
