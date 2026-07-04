@@ -1,10 +1,8 @@
-from .graph.builder import TERAGGraph, GraphBuilder
-from .retrieval.hybrid import HybridRetriever
-from .retrieval.semantic import SemanticRetriever
-from .retrieval import PPRRetriever
-from .ingestion.pipeline import run_ner_extraction, build_graph_from_ner, merge_graphs, deduplicate_graph
-from terag.core import TERAG, TERAGConfig
+"""Public API for TERAG."""
 
-__all__ = ["TERAG", "TERAGConfig"]
+from .core import TERAG, TERAGConfig
+from .retrieval.ppr import RetrievalMetrics, RetrievalResult
+
+__all__ = ["TERAG", "TERAGConfig", "RetrievalMetrics", "RetrievalResult"]
 
 __version__ = "0.8.0"

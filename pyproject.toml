@@ -45,3 +45,6 @@ fuzzy = [
 
 [tool.setuptools.packages.find]
 where = ["terag"]
+
+[tool.setuptools.package-dir]
+"" = "terag"
