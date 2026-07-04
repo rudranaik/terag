@@ -19,22 +19,43 @@ classifiers = [
 dependencies = [
     "numpy",
     "networkx",
-    "scikit-learn",
-    "openai",
-    "tiktoken",
-    "groq",
-    "python-dotenv",
     "tqdm"
 ]
 requires-python = ">=3.8"
 
 [project.optional-dependencies]
+openai = [
+    "openai",
+    "python-dotenv"
+]
+groq = [
+    "groq",
+    "python-dotenv"
+]
+bench = [
+    "openai",
+    "python-dotenv"
+]
+local = [
+    "sentence-transformers"
+]
 dev = [
     "pytest",
     "black",
-    "isort"
+    "isort",
+    "openai",
+    "groq",
+    "python-dotenv"
 ]
 fuzzy = [
+    "fuzzywuzzy",
+    "python-Levenshtein"
+]
+all = [
+    "openai",
+    "groq",
+    "python-dotenv",
+    "sentence-transformers",
     "fuzzywuzzy",
     "python-Levenshtein"
 ]

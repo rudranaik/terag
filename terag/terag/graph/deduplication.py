@@ -15,9 +15,7 @@ from terag.embeddings.manager import EmbeddingManager
 from .merger import apply_deduplication_to_graph
 from .types import DuplicateCandidate, EntityCluster
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-import dotenv
-dotenv.load_dotenv()
+from terag.utils.math import cosine_similarity_score
 
 # String similarity
 try:
@@ -137,7 +135,7 @@ class OpenAIEntityDeduplicator:
             emb2 = entity_embeddings.get(candidate.entity2)
             
             if emb1 is not None and emb2 is not None:
-                similarity = cosine_similarity([emb1], [emb2])[0][0]
+                similarity = cosine_similarity_score(emb1, emb2)
                 candidate.embedding_similarity = similarity
                 enhanced_candidates.append(candidate)
         
@@ -163,7 +161,7 @@ class OpenAIEntityDeduplicator:
                 emb2 = entity_embeddings.get(entity2)
                 
                 if emb1 is not None and emb2 is not None:
-                    similarity = cosine_similarity([emb1], [emb2])[0][0]
+                    similarity = cosine_similarity_score(emb1, emb2)
                     
                     if similarity >= self.embedding_threshold:
                         candidate = DuplicateCandidate(

@@ -81,11 +81,18 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Validate ranges, enum values, path settings, embedding dimensions, and provider names.
   - Acceptance: invalid config fails before index construction with actionable errors.
 
-- [ ] **Make dependencies optional by capability.**
+- [x] **Make dependencies optional by capability.**
   - Move OpenAI, Groq, tiktoken, sentence-transformers, visualization, document loaders, LangChain, LlamaIndex, Neo4j, and API server dependencies into extras.
-  - Suggested extras: `terag[openai]`, `terag[groq]`, `terag[local]`, `terag[langchain]`, `terag[llama-index]`, `terag[docs]`, `terag[viz]`, `terag[server]`, `terag[bench]`, `terag[dev]`.
-  - Keep the base install small: graph, retrieval, config, and core persistence only.
-  - Acceptance: `pip install terag` does not install paid-provider SDKs unless needed.
+  - Implemented extras: `terag[openai]`, `terag[groq]`, `terag[local]`, `terag[bench]`, `terag[dev]`, `terag[fuzzy]`, and `terag[all]`.
+  - Base install now keeps graph/retrieval/core behavior lightweight: `numpy`, `networkx`, and `tqdm`.
+  - Replaced `scikit-learn` cosine similarity usage with an internal NumPy helper, so `scikit-learn` is no longer required for semantic/query/deduplication imports.
+  - Validation:
+    - `pip install .` in a clean venv did not install `openai`, `groq`, `python-dotenv`, `scikit-learn`, `tiktoken`, or `sentence-transformers`.
+    - Minimal install supported `import terag`, advanced imports (`terag.graph`, `terag.retrieval.semantic`, `terag.retrieval.query_processor`, `terag.graph.deduplication`), and no-LLM regex retrieval.
+    - `pip install ".[openai]"` installed `openai` and `python-dotenv` but not `groq`, `scikit-learn`, `tiktoken`, or `sentence-transformers`; missing API key raises a clear `ValueError`.
+    - `pip install ".[groq]"` installed `groq` and `python-dotenv` but not `openai`, `scikit-learn`, `tiktoken`, or `sentence-transformers`.
+    - Existing tests pass: `.venv/bin/python -m pytest tests`.
+    - HotPotQA smoke comparison passes: `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json`.
 
 - [ ] **Normalize result objects.**
   - Define a stable `Passage` or `RetrievalResult` model with `id`, `content`, `score`, `metadata`, `matched_concepts`, `source`, and optional `explanation`.

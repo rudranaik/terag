@@ -9,9 +9,9 @@ entity matches in the graph structure.
 import logging
 from typing import List, Dict, Tuple, Optional
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 
 from terag.embeddings.manager import EmbeddingManager
+from terag.utils.math import cosine_similarity_score
 from .query_processor import ProcessedQuery
 
 logger = logging.getLogger(__name__)
@@ -127,9 +127,7 @@ class SemanticRetriever:
         # Calculate similarity with all passages
         for passage_id, passage_embedding in self.passage_embeddings.items():
             # Cosine similarity
-            similarity = cosine_similarity(
-                [query_embedding], [passage_embedding]
-            )[0][0]
+            similarity = cosine_similarity_score(query_embedding, passage_embedding)
             
             # Apply length boost if enabled
             if self.passage_length_boost:
@@ -197,9 +195,7 @@ class SemanticRetriever:
         
         # Calculate similarity
         passage_embedding = self.passage_embeddings[passage_id]
-        similarity = cosine_similarity(
-            [query_embedding], [passage_embedding]
-        )[0][0]
+        similarity = cosine_similarity_score(query_embedding, passage_embedding)
         
         return similarity
     
@@ -234,10 +230,10 @@ class SemanticRetriever:
             return explanation
         
         # Calculate similarity
-        similarity = cosine_similarity(
-            [processed_query.query_embedding], 
-            [self.passage_embeddings[passage_id]]
-        )[0][0]
+        similarity = cosine_similarity_score(
+            processed_query.query_embedding,
+            self.passage_embeddings[passage_id]
+        )
         
         explanation["similarity_score"] = similarity
         

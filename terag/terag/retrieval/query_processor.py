@@ -13,9 +13,9 @@ import logging
 from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 
 from terag.embeddings.manager import EmbeddingManager
+from terag.utils.math import cosine_similarity_score
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +312,7 @@ class QueryProcessor:
             
             # Find best matching graph entities
             for concept_id, entity_embedding in self.graph_entity_embeddings.items():
-                similarity = cosine_similarity([term_embedding], [entity_embedding])[0][0]
+                similarity = cosine_similarity_score(term_embedding, entity_embedding)
                 
                 # Lower threshold for individual terms
                 if similarity >= 0.6:  # Lower threshold than full query
@@ -347,7 +347,7 @@ class QueryProcessor:
         
         # This is the original method - keep as fallback
         for concept_id, entity_embedding in self.graph_entity_embeddings.items():
-            similarity = cosine_similarity([query_embedding], [entity_embedding])[0][0]
+            similarity = cosine_similarity_score(query_embedding, entity_embedding)
             
             # Use lower threshold since this is less reliable
             if similarity >= 0.5:  # Lower threshold for full query matching

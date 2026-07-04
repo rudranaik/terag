@@ -1,11 +1,10 @@
 numpy>=1.21.0
-sentence-transformers>=2.2.0  # Optional: for semantic weighting
 networkx>=3.0
-matplotlib>=3.5.0
-plotly>=5.0.0
-pyvis>=0.3.0
-groq>=0.4.0  # For LLM API calls
-requests>=2.28.0  # HTTP client
-python-dotenv>=0.19.0  # Environment variable management
-openai>=1.0.0  # For embedding API calls
-scikit-learn>=1.0.0  # For cosine similarity calculations
+tqdm>=4.0.0
+
+# Optional capabilities:
+#   pip install "terag[openai]"   # OpenAI NER and embeddings
+#   pip install "terag[groq]"     # Groq NER
+#   pip install "terag[local]"    # SentenceTransformers local embeddings
+#   pip install "terag[bench]"    # Benchmark harness provider dependencies
+#   pip install "terag[dev]"      # Tests and development tooling
