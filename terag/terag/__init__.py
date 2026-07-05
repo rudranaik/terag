@@ -2,7 +2,15 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from .core import TERAG, TERAGConfig
+from .config import (
+    EmbeddingConfig,
+    GraphConfig,
+    NERConfig,
+    RetrievalConfig,
+    StorageConfig,
+    TERAGConfig,
+)
+from .core import TERAG
 from .retrieval.ppr import RetrievalMetrics, RetrievalResult
 
 try:
@@ -13,6 +21,11 @@ except PackageNotFoundError:
 __all__ = [
     "TERAG",
     "TERAGConfig",
+    "GraphConfig",
+    "RetrievalConfig",
+    "NERConfig",
+    "EmbeddingConfig",
+    "StorageConfig",
     "RetrievalMetrics",
     "RetrievalResult",
     "__version__",

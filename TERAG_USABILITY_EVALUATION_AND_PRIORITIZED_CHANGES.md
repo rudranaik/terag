@@ -55,6 +55,7 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
   - Move lower-level graph/retrieval/ingestion modules behind documented advanced imports or private namespaces.
   - Add `__all__` and an API stability note.
   - Public top-level exports are now limited to `TERAG`, `TERAGConfig`, `RetrievalResult`, `RetrievalMetrics`, and `__version__`.
+  - Added focused public config models: `GraphConfig`, `RetrievalConfig`, `NERConfig`, `EmbeddingConfig`, and `StorageConfig`.
   - `__version__` now resolves from package metadata with a local fallback to avoid drift from `pyproject.toml`.
   - Added `docs/api-stability.md` documenting stable public imports, advanced imports, compatibility policy, and deprecation policy.
   - Added tests for public `__all__` and `__version__`.
@@ -92,10 +93,26 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
     - `.venv/bin/python -m pytest tests` passes, including old tuple-return and new query/insert API tests.
   - Acceptance: existing tests for old API pass while new API tests are added.
 
-- [ ] **Split configuration into focused validated models.**
+- [x] **Split configuration into focused validated models.**
   - Introduce `GraphConfig`, `RetrievalConfig`, `NERConfig`, `EmbeddingConfig`, `StorageConfig`, and optional `RuntimeConfig`.
   - Use Pydantic v2 or a lightweight validation layer with clear serialization.
   - Validate ranges, enum values, path settings, embedding dimensions, and provider names.
+  - Implemented lightweight dataclass config sections:
+    - `GraphConfig`
+    - `RetrievalConfig`
+    - `NERConfig`
+    - `EmbeddingConfig`
+    - `StorageConfig`
+  - `TERAGConfig` remains backward-compatible with existing flat keyword arguments while also accepting focused config objects or dictionaries.
+  - Added `TERAGConfig.to_dict()` for grouped serialization.
+  - Validation now rejects invalid concept-frequency settings, invalid frequency ratios, invalid retrieval modes, invalid `top_k`, invalid PPR settings, unsupported LLM providers, empty extraction cache paths, invalid semantic thresholds, and missing save paths when auto-save is enabled.
+  - Updated README, technical overview, API stability docs, and migration notes with grouped config examples.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes with config validation and compatibility coverage.
+    - `.venv/bin/python -m benchmarks.hotpotqa.scripts.compare --config benchmarks/hotpotqa/configs/smoke.json` passes against the accepted smoke baseline.
+    - `PYTHON=.venv/bin/python make bench-inspect-smoke` passes and regenerates the qualitative retrieval report.
+    - Built wheel contains `terag/config.py` and no `examples/`, `tests/`, `benchmarks/`, or `hotpotqa_data/` entries.
+    - Fresh temporary venv import validates focused config imports and rejects invalid `top_k=0` with a clear `ValueError`.
   - Acceptance: invalid config fails before index construction with actionable errors.
 
 - [x] **Make dependencies optional by capability.**

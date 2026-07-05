@@ -23,14 +23,13 @@ pip install "terag[dev]"      # tests and development tools
 ## Quickstart
 
 ```python
-from terag import TERAG, TERAGConfig
+from terag import EmbeddingConfig, GraphConfig, RetrievalConfig, TERAG, TERAGConfig
 
 rag = TERAG.empty(
     config=TERAGConfig(
-        top_k=3,
-        min_concept_freq=1,
-        max_concept_freq_ratio=1.0,
-        use_semantic_entity_matching=False,
+        graph_config=GraphConfig(min_concept_freq=1, max_concept_freq_ratio=1.0),
+        retrieval_config=RetrievalConfig(top_k=3),
+        embedding_config=EmbeddingConfig(use_semantic_entity_matching=False),
     )
 )
 

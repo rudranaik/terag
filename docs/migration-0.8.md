@@ -49,6 +49,31 @@ rag.insert([
 
 `insert()` currently rebuilds the in-memory graph. True incremental updates are tracked separately in the adoption checklist.
 
+## Prefer Focused Config Sections
+
+Flat `TERAGConfig` keyword arguments still work:
+
+```python
+config = TERAGConfig(
+    min_concept_freq=1,
+    top_k=3,
+    use_llm_for_ner=False,
+)
+```
+
+For new code, prefer grouped config sections because they make each setting easier to understand:
+
+```python
+from terag import GraphConfig, RetrievalConfig, TERAGConfig
+
+config = TERAGConfig(
+    graph_config=GraphConfig(min_concept_freq=1),
+    retrieval_config=RetrievalConfig(top_k=3),
+)
+```
+
+TERAG mirrors grouped values back to the old flat attributes, so existing package internals and older user code can still read `config.top_k` or `config.min_concept_freq`.
+
 ## Result Objects
 
 Old field names remain:

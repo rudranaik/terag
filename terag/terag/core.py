@@ -12,51 +12,15 @@ import json
 import os
 import logging
 from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
 import time
 
+from terag.config import TERAGConfig
 from terag.graph.builder import TERAGGraph, GraphBuilder
 from terag.ingestion.ner_extractor import NERExtractor
 from terag.ingestion.query_ner import ImprovedQueryNER
 from terag.retrieval.ppr import TERAGRetriever as PPRRetriever, RetrievalResult, RetrievalMetrics
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class TERAGConfig:
-    """Configuration for TERAG system"""
-    # Graph construction
-    min_concept_freq: int = 2
-    max_concept_freq_ratio: float = 0.5
-    enable_concept_clustering: bool = False
-
-    # PPR parameters
-    ppr_alpha: float = 0.15
-    ppr_max_iterations: int = 100
-
-    # Weighting
-    semantic_weight: float = 0.5
-    frequency_weight: float = 0.5
-
-    # Retrieval
-    top_k: int = 10
-    default_retrieval_method: str = "ppr"  # "ppr", "semantic", or "hybrid"
-
-    # Semantic entity matching
-    use_semantic_entity_matching: bool = True  # Enable semantic similarity-based entity matching
-    semantic_match_threshold: float = 0.7  # Cosine similarity threshold for semantic matching
-    
-    # Optional LLM for enhanced NER
-    use_llm_for_ner: bool = False
-    llm_provider: str = "groq"  # "groq" or "openai"
-    llm_model: Optional[str] = None
-    llm_api_key: Optional[str] = None  # Override env var
-    extraction_cache_dir: str = "extraction_cache"
-    
-    # Graph persistence
-    auto_save_graph: bool = False
-    graph_save_path: Optional[str] = "terag_graph.json"  # Default save location
 
 
 class TERAG:

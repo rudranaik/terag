@@ -1,6 +1,14 @@
 import pytest
 import terag as terag_module
-from terag import TERAG, TERAGConfig
+from terag import (
+    EmbeddingConfig,
+    GraphConfig,
+    NERConfig,
+    RetrievalConfig,
+    StorageConfig,
+    TERAG,
+    TERAGConfig,
+)
 from terag import RetrievalResult, RetrievalMetrics
 
 def test_terag_initialization_and_retrieval():
@@ -72,6 +80,11 @@ def test_public_api_exports_stable_top_level_names():
     assert set(terag_module.__all__) == {
         "TERAG",
         "TERAGConfig",
+        "GraphConfig",
+        "RetrievalConfig",
+        "NERConfig",
+        "EmbeddingConfig",
+        "StorageConfig",
         "RetrievalMetrics",
         "RetrievalResult",
         "__version__",
@@ -82,6 +95,90 @@ def test_terag_config():
     config = TERAGConfig(top_k=5, ppr_alpha=0.2)
     assert config.top_k == 5
     assert config.ppr_alpha == 0.2
+    assert config.retrieval_config.top_k == 5
+    assert config.retrieval_config.ppr_alpha == 0.2
+
+def test_focused_config_sections_sync_flat_compatibility_fields():
+    config = TERAGConfig(
+        graph_config=GraphConfig(min_concept_freq=3, max_concept_freq_ratio=0.8),
+        retrieval_config=RetrievalConfig(
+            top_k=4,
+            default_retrieval_method="hybrid",
+            ppr_alpha=0.25,
+            ppr_max_iterations=50,
+            semantic_weight=0.7,
+            frequency_weight=0.3,
+        ),
+        ner_config=NERConfig(
+            use_llm_for_ner=True,
+            llm_provider="openai",
+            llm_model="gpt-5-nano",
+            extraction_cache_dir=".cache/extraction",
+        ),
+        embedding_config=EmbeddingConfig(
+            use_semantic_entity_matching=False,
+            semantic_match_threshold=0.6,
+        ),
+        storage_config=StorageConfig(
+            auto_save_graph=True,
+            graph_save_path="graph.json",
+        ),
+    )
+
+    assert config.min_concept_freq == 3
+    assert config.max_concept_freq_ratio == 0.8
+    assert config.top_k == 4
+    assert config.default_retrieval_method == "hybrid"
+    assert config.ppr_alpha == 0.25
+    assert config.ppr_max_iterations == 50
+    assert config.semantic_weight == 0.7
+    assert config.frequency_weight == 0.3
+    assert config.use_llm_for_ner is True
+    assert config.llm_provider == "openai"
+    assert config.llm_model == "gpt-5-nano"
+    assert config.extraction_cache_dir == ".cache/extraction"
+    assert config.use_semantic_entity_matching is False
+    assert config.semantic_match_threshold == 0.6
+    assert config.auto_save_graph is True
+    assert config.graph_save_path == "graph.json"
+    assert config.to_dict()["retrieval_config"]["top_k"] == 4
+
+def test_terag_config_accepts_section_dicts():
+    config = TERAGConfig(
+        graph_config={"min_concept_freq": 1, "max_concept_freq_ratio": 1.0},
+        retrieval_config={"top_k": 2, "default_retrieval_method": "ppr"},
+        ner_config={"use_llm_for_ner": False, "llm_provider": "groq"},
+        embedding_config={"use_semantic_entity_matching": False},
+        storage_config={"auto_save_graph": False},
+    )
+
+    assert isinstance(config.graph_config, GraphConfig)
+    assert config.min_concept_freq == 1
+    assert config.top_k == 2
+    assert config.use_semantic_entity_matching is False
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: GraphConfig(min_concept_freq=0),
+        lambda: GraphConfig(max_concept_freq_ratio=0),
+        lambda: GraphConfig(max_concept_freq_ratio=1.5),
+        lambda: RetrievalConfig(top_k=0),
+        lambda: RetrievalConfig(default_retrieval_method="magic"),
+        lambda: RetrievalConfig(ppr_alpha=-0.1),
+        lambda: RetrievalConfig(ppr_max_iterations=0),
+        lambda: RetrievalConfig(semantic_weight=0, frequency_weight=0),
+        lambda: NERConfig(llm_provider="unknown"),
+        lambda: NERConfig(extraction_cache_dir=""),
+        lambda: EmbeddingConfig(semantic_match_threshold=2.0),
+        lambda: StorageConfig(auto_save_graph=True, graph_save_path=None),
+        lambda: TERAGConfig(top_k=-1),
+        lambda: TERAGConfig(graph_config=object()),
+    ],
+)
+def test_config_validation_rejects_invalid_values(factory):
+    with pytest.raises((TypeError, ValueError)):
+        factory()
 
 def test_query_returns_results_without_metrics_by_default():
     chunks = [

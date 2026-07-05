@@ -7,13 +7,29 @@ TERAG is still pre-1.0, but the package now has a small public API surface that 
 Prefer importing from `terag`:
 
 ```python
-from terag import TERAG, TERAGConfig, RetrievalResult, RetrievalMetrics, __version__
+from terag import (
+    EmbeddingConfig,
+    GraphConfig,
+    NERConfig,
+    RetrievalConfig,
+    RetrievalMetrics,
+    RetrievalResult,
+    StorageConfig,
+    TERAG,
+    TERAGConfig,
+    __version__,
+)
 ```
 
 These names are part of the supported public API:
 
 - `TERAG`
 - `TERAGConfig`
+- `GraphConfig`
+- `RetrievalConfig`
+- `NERConfig`
+- `EmbeddingConfig`
+- `StorageConfig`
 - `RetrievalResult`
 - `RetrievalMetrics`
 - `__version__`

@@ -57,13 +57,48 @@ When an embedding model is available, TERAG can match query terms to graph conce
 Semantic matching is controlled by:
 
 ```python
-TERAGConfig(
-    use_semantic_entity_matching=True,
-    semantic_match_threshold=0.7,
+from terag import EmbeddingConfig, TERAGConfig
+
+config = TERAGConfig(
+    embedding_config=EmbeddingConfig(
+        use_semantic_entity_matching=True,
+        semantic_match_threshold=0.7,
+    )
 )
 ```
 
 Higher thresholds favor precision. Lower thresholds favor recall.
+
+## Configuration
+
+TERAG has focused config sections for new code:
+
+```python
+from terag import (
+    EmbeddingConfig,
+    GraphConfig,
+    NERConfig,
+    RetrievalConfig,
+    StorageConfig,
+    TERAGConfig,
+)
+
+config = TERAGConfig(
+    graph_config=GraphConfig(min_concept_freq=1),
+    retrieval_config=RetrievalConfig(top_k=5, default_retrieval_method="ppr"),
+    ner_config=NERConfig(use_llm_for_ner=False),
+    embedding_config=EmbeddingConfig(use_semantic_entity_matching=False),
+    storage_config=StorageConfig(auto_save_graph=False),
+)
+```
+
+Older flat keyword arguments are still supported for compatibility:
+
+```python
+config = TERAGConfig(min_concept_freq=1, top_k=5, use_llm_for_ner=False)
+```
+
+Invalid values fail before graph construction, for example unsupported retrieval modes, negative `top_k`, invalid thresholds, or missing graph save paths when auto-save is enabled.
 
 ## Retrieval Modes
 
