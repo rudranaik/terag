@@ -16,6 +16,7 @@ Optional provider and development extras:
 pip install "terag[openai]"   # OpenAI NER/embeddings
 pip install "terag[groq]"     # Groq NER
 pip install "terag[local]"    # local SentenceTransformers embeddings
+pip install "terag[langchain]" # LangChain retriever adapter
 pip install "terag[bench]"    # benchmark tooling
 pip install "terag[dev]"      # tests and development tools
 ```
@@ -127,6 +128,7 @@ The benchmark keeps generated data and caches outside git so repeated runs are m
 - [How TERAG retrieval works](/docs/retrieval-flow.md)
 - [API stability](/docs/api-stability.md)
 - [Migration notes from 0.8.x](/docs/migration-0.8.md)
+- [LangChain integration](/docs/langchain-integration.md)
 - [HotPotQA benchmark harness](/benchmarks/hotpotqa/README.md)
 - [Adoption readiness checklist](/TERAG_USABILITY_EVALUATION_AND_PRIORITIZED_CHANGES.md)
 

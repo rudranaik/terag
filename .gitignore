@@ -58,6 +58,7 @@ k.txt
 extraction_cache/
 retrieval_results/
 quick_extraction_cache/
+local_playground/
 
 # Benchmark generated artifacts
 .benchmark_data/

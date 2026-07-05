@@ -449,6 +449,26 @@ class TERAG:
             return results, metrics
         return results
 
+    def as_langchain_retriever(
+        self,
+        method: Optional[str] = None,
+        top_k: Optional[int] = None,
+        ppr_weight: float = 0.6,
+        semantic_weight: float = 0.4,
+        min_score_threshold: Optional[float] = None
+    ):
+        """Return a LangChain-compatible retriever for this TERAG instance."""
+        from terag.integrations.langchain import TERAGRetriever
+
+        return TERAGRetriever(
+            terag=self,
+            method=method,
+            top_k=top_k,
+            ppr_weight=ppr_weight,
+            semantic_weight=semantic_weight,
+            min_score_threshold=min_score_threshold,
+        )
+
     def add_chunks(
         self,
         chunks: List[Dict],

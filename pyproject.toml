@@ -39,13 +39,17 @@ bench = [
 local = [
     "sentence-transformers"
 ]
+langchain = [
+    "langchain-core"
+]
 dev = [
     "pytest",
     "black",
     "isort",
     "openai",
     "groq",
-    "python-dotenv"
+    "python-dotenv",
+    "langchain-core"
 ]
 fuzzy = [
     "fuzzywuzzy",
@@ -56,6 +60,7 @@ all = [
     "groq",
     "python-dotenv",
     "sentence-transformers",
+    "langchain-core",
     "fuzzywuzzy",
     "python-Levenshtein"
 ]

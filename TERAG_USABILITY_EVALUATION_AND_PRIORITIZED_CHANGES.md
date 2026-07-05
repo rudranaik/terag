@@ -171,10 +171,23 @@ TERAG should be considered mainstream-adoption-ready only when these gates are t
 
 ### P1 - High: Swappability, Index Lifecycle, and Developer Experience
 
-- [ ] **Add LangChain integration.**
+- [x] **Add LangChain integration.**
   - Implement `terag.integrations.langchain.TERAGRetriever`.
   - Support modern LangChain retriever methods and `Document` conversion.
   - Keep LangChain dependency optional.
+  - Added optional `terag[langchain]` extra using `langchain-core`.
+  - Added `terag.integrations.langchain.TERAGRetriever` implementing LangChain's modern `BaseRetriever` interface.
+  - Added `TERAG.as_langchain_retriever()` convenience method.
+  - Added `results_to_documents()` conversion preserving TERAG result content, score, id, passage id, matched concepts, and original chunk metadata.
+  - Added `docs/langchain-integration.md` and linked it from README.
+  - Added integration tests for Document conversion and retriever `.invoke()`.
+  - Validation:
+    - `.venv/bin/python -m pytest tests` passes with LangChain integration tests.
+    - Local-only `local_playground/langchain_e2e_demo.py` runs end to end and prints retrieved LangChain Documents.
+    - Built wheel contains `terag/integrations/langchain.py` and no `examples/`, `tests/`, `benchmarks/`, `hotpotqa_data/`, or `local_playground/` entries.
+    - Fresh base install imports TERAG without LangChain and raises a clear optional-extra error if the adapter is instantiated.
+    - Fresh `terag[langchain]` install returns real LangChain `Document` objects from `rag.as_langchain_retriever().invoke(...)`.
+    - HotPotQA smoke comparison and qualitative inspection still pass.
   - Acceptance: documented example can replace a vectorstore retriever with TERAG in a LangChain chain.
 
 - [ ] **Add LlamaIndex integration.**
@@ -409,8 +422,4 @@ nodes = retriever.retrieve("What happened to Apple revenue?")
 
 ## Completion Tracking
 
-Use the checkboxes above as the source of truth. When an item is implemented, update the checkbox and add a short note with the PR/commit and validation command, for example:
-
-```markdown
-- [x] Add LangChain integration. Completed in <commit>; validated with `pytest tests/integrations/test_langchain.py`.
-```
+Use the checkboxes above as the source of truth. When an item is implemented, update the checkbox and add a short note with the validation commands and any follow-up constraints.
