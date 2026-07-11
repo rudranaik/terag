@@ -42,6 +42,12 @@ local = [
 langchain = [
     "langchain-core"
 ]
+visual = [
+    "openai",
+    "python-dotenv",
+    "streamlit",
+    "pypdf"
+]
 dev = [
     "pytest",
     "black",
@@ -61,6 +67,8 @@ all = [
     "python-dotenv",
     "sentence-transformers",
     "langchain-core",
+    "streamlit",
+    "pypdf",
     "fuzzywuzzy",
     "python-Levenshtein"
 ]

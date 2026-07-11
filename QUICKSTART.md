@@ -1,99 +1,259 @@
-# TERAG Quick Start Guide
+# TERAG Quickstart
 
-TERAG (Text-Entity Retrieval Augmented Generation) builds a graph of your documents, linking passages through shared concepts (entities) for better retrieval.
+This guide covers the shortest supported path from installation to retrieval,
+then adds provider-backed extraction, persistence, and LangChain integration.
 
-## Installation
+## 1. Install TERAG
+
+The core package supports offline graph construction and PPR retrieval:
 
 ```bash
 pip install terag
 ```
 
-## 1. Basic Usage (No LLM required)
+For a provider or integration, install the corresponding extra:
 
-The fastest way to get started. TERAG will use regex patterns to extract entities.
+```bash
+pip install "terag[openai]"
+pip install "terag[groq]"
+pip install "terag[local]"
+pip install "terag[langchain]"
+```
+
+## 2. Build an Offline Index
+
+Regex entity extraction is enabled by default. Disabling semantic entity
+matching keeps this example independent of embedding providers and API keys.
 
 ```python
-from terag import TERAG, TERAGConfig
+from terag import EmbeddingConfig, GraphConfig, RetrievalConfig, TERAG, TERAGConfig
 
-# 1. Load your chunks (list of dicts with 'content')
-chunks = [
-    {"content": "Apple released the new iPhone in September."},
-    {"content": "Microsoft announced Azure AI improvements."}
-]
+config = TERAGConfig(
+    graph_config=GraphConfig(
+        min_concept_freq=1,
+        max_concept_freq_ratio=1.0,
+    ),
+    retrieval_config=RetrievalConfig(top_k=3),
+    embedding_config=EmbeddingConfig(
+        use_semantic_entity_matching=False,
+    ),
+)
 
-# 2. Build the graph
-# use_llm_for_ner=False uses regex (fast, no API key needed)
-config = TERAGConfig(use_llm_for_ner=False)
-terag = TERAG.from_chunks(chunks, config=config)
+rag = TERAG.empty(config=config)
+rag.insert(
+    [
+        "Apple released a new iPhone in September.",
+        "Apple reported strong services revenue in Q4.",
+        "Microsoft announced improvements to Azure AI.",
+    ]
+)
 
-# 3. Query the graph
-results, metrics = terag.retrieve("What did Apple release?")
+results = rag.query("What did Apple report?")
 
 for result in results:
-    print(f"[{result.score:.2f}] {result.content}")
+    print(f"[{result.score:.3f}] {result.content}")
 ```
 
-## 2. Enhanced Accuracy (Using LLM)
+`insert()` accepts:
 
-For better concept extraction, use an LLM provider (Groq or OpenAI).
+- strings;
+- dictionaries containing `content` or `text` and optional `metadata`;
+- document-like objects with `page_content` and optional `metadata`, including
+  LangChain documents.
+
+For already chunked data, `TERAG.from_chunks()` remains supported:
 
 ```python
-import os
+chunks = [
+    {
+        "content": "Apple reported strong services revenue in Q4.",
+        "metadata": {"source": "earnings-report", "page": 4},
+    }
+]
 
-# Set API key (or pass via config)
-os.environ["GROQ_API_KEY"] = "your-key-here"
-
-# Configure for LLM
-config = TERAGConfig(
-    use_llm_for_ner=True,
-    llm_provider="groq"  # or "openai"
-)
-
-terag = TERAG.from_chunks(chunks, config=config)
+rag = TERAG.from_chunks(chunks, config=config, verbose=False)
 ```
 
-## 3. Saving and Loading Graphs
+## 3. Query and Inspect Results
 
-Build once, reuse many times.
+The preferred application API returns results directly:
 
 ```python
-# Enable auto-save
-config = TERAGConfig(
-    auto_save_graph=True,
-    graph_save_path="./my_knowledge_graph.json"
-)
-terag = TERAG.from_chunks(chunks, config=config)
+results = rag.query("What did Apple report?", top_k=2)
 
-# Later, load the graph instantly
-terag_loaded = TERAG.from_graph_file("./my_knowledge_graph.json")
+for result in results:
+    print(result.id)
+    print(result.content)
+    print(result.score)
+    print(result.matched_concepts)
+    print(result.metadata)
 ```
 
-## 4. Multi-LLM Support
+Use `retrieve()` or `return_metrics=True` when you also need retrieval metrics:
 
-TERAG supports multiple LLM providers for Entity Recognition.
-
-### OpenAI
 ```python
-os.environ["OPENAI_API_KEY"] = "sk-..."
-config = TERAGConfig(
-    use_llm_for_ner=True, 
-    llm_provider="openai", 
-    model="gpt-4o-mini"
+results, metrics = rag.retrieve("What did Apple report?", top_k=2)
+results, metrics = rag.query(
+    "What did Apple report?",
+    top_k=2,
+    return_metrics=True,
 )
 ```
 
-### Groq (Default)
+Available methods are `ppr`, `semantic`, and `hybrid`:
+
 ```python
-os.environ["GROQ_API_KEY"] = "gsk-..."
+ppr_results = rag.query("Apple revenue", method="ppr")
+```
+
+Semantic and hybrid methods require an embedding model; the offline instance
+above intentionally supports only PPR retrieval.
+
+## 4. Use OpenAI Entity Extraction and Embeddings
+
+Install the OpenAI extra and provide the key through the environment:
+
+```bash
+pip install "terag[openai]"
+export OPENAI_API_KEY="your-key"
+```
+
+```python
+from terag import EmbeddingConfig, NERConfig, RetrievalConfig, TERAG, TERAGConfig
+from terag.embeddings.manager import EmbeddingManager
+
 config = TERAGConfig(
-    use_llm_for_ner=True, 
-    llm_provider="groq", 
-    model="llama3-8b-8192"
+    ner_config=NERConfig(
+        use_llm_for_ner=True,
+        llm_provider="openai",
+        llm_model="gpt-5-nano",
+    ),
+    retrieval_config=RetrievalConfig(
+        top_k=5,
+        default_retrieval_method="hybrid",
+    ),
+    embedding_config=EmbeddingConfig(
+        use_semantic_entity_matching=True,
+        semantic_match_threshold=0.7,
+    ),
+)
+
+embeddings = EmbeddingManager(model="text-embedding-3-small")
+rag = TERAG.from_chunks(
+    chunks,
+    config=config,
+    embedding_model=embeddings,
+    verbose=False,
+)
+
+results = rag.query(
+    "Which company improved financially?",
+    method="hybrid",
 )
 ```
+
+Provider calls may send chunk or query content to that provider. Review its
+privacy, retention, and rate-limit policies before using sensitive data.
+
+## 5. Use Groq for Entity Extraction
+
+Groq can perform entity extraction while PPR retrieval remains local:
+
+```bash
+pip install "terag[groq]"
+export GROQ_API_KEY="your-key"
+```
+
+```python
+from terag import NERConfig, TERAGConfig
+
+config = TERAGConfig(
+    ner_config=NERConfig(
+        use_llm_for_ner=True,
+        llm_provider="groq",
+        llm_model="llama-3.1-8b-instant",
+    )
+)
+```
+
+Model availability can change; select a currently available model supported by
+your provider account.
+
+## 6. Save and Reload the Graph
+
+```python
+rag.save_graph("terag_graph.json")
+
+loaded = TERAG.from_graph_file(
+    "terag_graph.json",
+    config=rag.config,
+    embedding_model=rag.embedding_model,
+    verbose=False,
+)
+
+results = loaded.query("What did Apple report?")
+```
+
+Keep the same embedding configuration when reloading a graph for semantic or
+hybrid retrieval. Graph files include original passage content and metadata, so
+store them appropriately.
+
+## 7. Use TERAG as a LangChain Retriever
+
+```bash
+pip install "terag[langchain]"
+```
+
+```python
+retriever = rag.as_langchain_retriever(method="ppr", top_k=2)
+documents = retriever.invoke("What did Apple report?")
+
+for document in documents:
+    print(document.page_content)
+    print(document.metadata["score"])
+```
+
+Original metadata is retained and TERAG adds identifiers, scores, and matched
+concepts. See [docs/langchain-integration.md](docs/langchain-integration.md) for
+the complete metadata contract.
+
+## 8. Update an Existing Index
+
+```python
+rag.insert(["Apple announced another services expansion."])
+```
+
+The current implementation rebuilds the in-memory graph from the existing and
+new documents. This is correct but can be expensive for large collections; a
+true incremental indexing backend is not yet available.
 
 ## Troubleshooting
 
-- **"LLM not available"**: Check your API key. If you don't have one, set `use_llm_for_ner=False`.
-- **Blank Results**: Ensure your query contains at least one entity (person, place, concept) present in your documents.
-- **ImportError**: Make sure you have installed the necessary provider packages (`pip install openai` or `pip install groq`).
+### Provider package is missing
+
+Install the matching extra, such as `terag[openai]` or `terag[groq]`. The base
+installation deliberately excludes provider SDKs.
+
+### An API key is not found
+
+Set `OPENAI_API_KEY` or `GROQ_API_KEY`, or supply `llm_api_key` in `NERConfig`.
+For an offline workflow, leave `use_llm_for_ner=False`.
+
+### Semantic or hybrid retrieval fails
+
+These modes need a compatible embedding model. Use PPR for the dependency-free
+path, or install and configure an embedding provider.
+
+### Results are empty or weak
+
+- Set `min_concept_freq=1` for small collections.
+- Confirm that the documents and query contain recognizable concepts.
+- Try semantic or hybrid retrieval for paraphrased queries.
+- Inspect `matched_concepts` and retrieval metrics before changing thresholds.
+
+## Next Steps
+
+- Read the [technical overview](docs/technical-overview.md).
+- Follow the [retrieval flow](docs/retrieval-flow.md).
+- Review the [API stability policy](docs/api-stability.md).
+- Explore the graph visually with [examples/README.md](examples/README.md).

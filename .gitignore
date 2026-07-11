@@ -60,6 +60,9 @@ retrieval_results/
 quick_extraction_cache/
 local_playground/
 
+# Example generated artifacts
+examples/visual_explorer_output/
+
 # Benchmark generated artifacts
 .benchmark_data/
 .benchmark_cache/
