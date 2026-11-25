@@ -99,21 +99,23 @@ fi
 # --- Preflight checks ---
 info "Running preflight checks..."
 
-command -v python3 >/dev/null || fatal "python3 not found"
-command -v git     >/dev/null || fatal "git not found"
+command -v git >/dev/null || fatal "git not found"
 
-# Check tools, install if missing
+# Prefer the project .venv if it exists and has python
+if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
+    PYTHON="$REPO_ROOT/.venv/bin/python"
+    info "Using project venv: $PYTHON"
+else
+    PYTHON="python3"
+    info "Using system python: $PYTHON"
+fi
+command -v "$PYTHON" >/dev/null || fatal "python not found"
+
+# Check tools, install if missing (into whichever python we picked)
 for tool in build twine pytest; do
-    if ! python3 -m "$tool" --version &>/dev/null 2>&1; then
-        if [[ "$tool" == "pytest" ]]; then
-            python3 -m pytest --version &>/dev/null 2>&1 || {
-                warn "$tool not found, installing..."
-                python3 -m pip install --quiet "$tool"
-            }
-        else
-            warn "$tool not found, installing..."
-            python3 -m pip install --quiet "$tool"
-        fi
+    if ! "$PYTHON" -m "$tool" --version &>/dev/null 2>&1; then
+        warn "$tool not found, installing..."
+        "$PYTHON" -m pip install --quiet "$tool"
     fi
 done
 
@@ -159,7 +161,7 @@ if $SKIP_TESTS; then
     warn "Skipping tests (--skip-tests)"
 else
     info "Running tests..."
-    python3 -m pytest -q || {
+    "$PYTHON" -m pytest -q || {
         # Revert the version bump on test failure
         sed -i '' "s/^version = \"$NEW_VERSION\"/version = \"$CURRENT\"/" "$PYPROJECT"
         sed -i '' "s/__version__ = \"$NEW_VERSION\"/__version__ = \"$CURRENT\"/" "$INIT_PY"
@@ -173,14 +175,14 @@ info "Cleaning old builds..."
 rm -rf dist/ build/ terag/terag.egg-info/ terag/*.egg-info
 
 info "Building sdist and wheel..."
-python3 -m build --outdir dist/
+"$PYTHON" -m build --outdir dist/
 
 info "Build artifacts:"
 ls -lh dist/
 
 # --- Validate ---
 info "Running twine check..."
-python3 -m twine check --strict dist/* || {
+"$PYTHON" -m twine check --strict dist/* || {
     sed -i '' "s/^version = \"$NEW_VERSION\"/version = \"$CURRENT\"/" "$PYPROJECT"
     sed -i '' "s/__version__ = \"$NEW_VERSION\"/__version__ = \"$CURRENT\"/" "$INIT_PY"
     fatal "twine check failed. Version bump reverted."
@@ -189,7 +191,7 @@ python3 -m twine check --strict dist/* || {
 # --- Test install ---
 info "Test-installing wheel in temp venv..."
 TMPVENV=$(mktemp -d)
-python3 -m venv "$TMPVENV"
+"$PYTHON" -m venv "$TMPVENV"
 "$TMPVENV/bin/python" -m pip install --quiet dist/*.whl
 "$TMPVENV/bin/python" -c "
 from terag import TERAG, TERAGConfig, __version__
@@ -229,7 +231,7 @@ git push origin "$TAG"
 # --- Optional local upload ---
 if $LOCAL_UPLOAD; then
     info "Uploading to PyPI directly (--local mode)..."
-    python3 -m twine upload dist/*
+    "$PYTHON" -m twine upload dist/*
 else
     info "Tag $TAG pushed. GitHub Actions will publish to PyPI."
     echo ""
