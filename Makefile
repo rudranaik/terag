@@ -1,6 +1,23 @@
 PYTHON ?= python3
 
-.PHONY: bench-sample-smoke bench-sample-hotpotqa-5pct bench-smoke bench-inspect-smoke bench-hotpotqa-5pct bench-hotpotqa-full bench-compare-smoke bench-compare-hotpotqa-5pct
+.PHONY: bench-sample-smoke bench-sample-hotpotqa-5pct bench-smoke bench-inspect-smoke bench-hotpotqa-5pct bench-hotpotqa-full bench-compare-smoke bench-compare-hotpotqa-5pct release release-dry release-patch release-minor release-major
+
+# --- Release targets ---
+release-dry:
+	./scripts/release.sh --dry-run patch
+
+release-patch:
+	./scripts/release.sh patch
+
+release-minor:
+	./scripts/release.sh minor
+
+release-major:
+	./scripts/release.sh major
+
+release:
+	@echo "Usage: make release-patch | release-minor | release-major"
+	@echo "       make release-dry   (validate without pushing)"
 
 bench-sample-smoke:
 	$(PYTHON) -m benchmarks.hotpotqa.scripts.sample --config benchmarks/hotpotqa/configs/smoke.json
